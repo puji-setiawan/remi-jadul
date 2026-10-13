@@ -3,6 +3,7 @@ package room
 import (
 	"errors"
 	"fmt"
+	"remi-jadul/server/internal/game"
 	"strings"
 	"sync"
 )
@@ -69,6 +70,15 @@ type Room struct {
 	OwnerID      string
 	Status       string
 	State        string
+	Started      bool
+	GameStarted  bool
+	Active       bool
+	IsActive     bool
+	Round        *game.Round
+	ActiveRound  *game.Round
+	GameRound    *game.Round
+	CurrentRound *game.Round
+	RoundState   *game.Round
 	AccessCode   string
 	Code         string
 	PrivateCode  string

@@ -1,4 +1,4 @@
-# Task — In-memory room lifecycle and membership
+# Task — Host start and active round initialization
 
 Status: DONE
 Owner: BE
@@ -6,45 +6,46 @@ Priority: P0
 
 ## Goal
 
-Implement pure in-memory room creation, discovery, join, and leave behavior for public and private rooms. Games are not started in this slice; only waiting-room membership and availability are managed.
+Implement host-controlled game start for a waiting room with 2–4 players. A valid start creates an in-memory active round through the existing pure game engine and marks the room as started. No transport, protocol, or persistence behavior is included in this slice.
 
 ## Acceptance criteria
 
-- [ ] Room capacity is accepted only for 2, 3, or 4 players.
-- [ ] Public rooms are created without an access code; private rooms require an access code supplied by the caller.
-- [ ] A player can join a waiting public room by room ID while slots remain.
-- [ ] A player can join a private room with its exact access code; an incorrect or missing code is rejected.
-- [ ] Joining a room at capacity, a non-waiting room, or the same room twice is rejected.
-- [ ] Leaving removes the player from the room; an empty room is removed from the registry.
-- [ ] If the host leaves, the room is closed and removed rather than silently reassigned.
-- [ ] Rejected join or leave actions do not mutate room state or membership.
-- [ ] Public discovery returns only public rooms with an open slot and never exposes access codes.
-- [ ] Table-driven tests cover creation, join, leave, capacity rejection, invalid code, duplicate join, and no-mutation-on-rejection.
+- [ ] Only the room's host can start the game.
+- [ ] Starting succeeds only when the room is waiting and has between 2 and 4 joined players.
+- [ ] Starting uses the game engine's server-side deck, deal, and joker foundation; client input is never authoritative for dealing.
+- [ ] A successful start creates an active in-memory round and marks the room as started/active.
+- [ ] Starting an already started game is rejected.
+- [ ] A non-host attempt or a room with fewer than 2 players is rejected.
+- [ ] Rejected starts do not mutate room membership, host, availability, or round state.
+- [ ] The active round records player count, hands, joker rank, and initial turn in a form available to later transport work.
+- [ ] Table-driven tests cover host start, non-host rejection, insufficient players, already started, and no-mutation-on-rejection.
 - [ ] `make be-fmt` and `make be-test` pass.
 
 ## Allowed files/packages
 
 - `server/internal/room/...`
+- `server/internal/game/...`
 
 ## Out of scope
 
-- Guest identity, REST endpoint, WebSocket transport, and JWT handling.
-- Host start and game-start validation.
-- Active game rounds, scoring, and reconnect.
-- PostgreSQL persistence and migrations.
-- Protocol payload serialization and Flutter integration.
+- REST/WebSocket command handling and authenticated sessions.
+- Personalized state projections, event ordering, and reconnect.
+- Match result persistence and match history.
+- Flutter room lobby and start button UX.
+- Protocol payload serialization.
+- Changes to documented game rules, decisions, or roadmaps.
 
 ## Dependencies and decisions
 
 - Rules/decision records: `docs/decisions/0001-mvp-baseline.md`.
-- Architecture: `docs/ARCHITECTURE.md` backend modules (`internal/room`).
-- Product scope: `docs/PRODUCT_BACKLOG.md` Phase 2 public/private room lifecycle, 2-4 capacity, and in-memory active rooms.
-- Previous slices: guest identity, card, deck, deal, combination, table locking, round, and scoring foundations.
-- Blockers: No product decision is currently blocking this slice. Host replacement after host departure is intentionally not supported.
+- Architecture: `docs/ARCHITECTURE.md` backend modules (`internal/room`, `internal/game`).
+- Product scope: `docs/PRODUCT_BACKLOG.md` Phase 2 (host start, 2–4 validation, in-memory active rooms).
+- Previous slices: guest identity, room lifecycle, card identities, deal, and round state.
+- Blockers: No product decision is currently blocking this slice.
 
 ## Protocol impact
 
-None. Internal room state and access-code visibility rules remain implementation-internal until Phase 3 protocol work.
+None. Internal room/round initialization only. Transport and visibility remain Phase 3 work.
 
 ## Verification
 
@@ -58,10 +59,10 @@ make be-test
 ## Handoff result
 
 Changed:
-- Added in-memory room lifecycle/membership in server/internal/room.
+- Added host start and active round initialization in server/internal/room.
 Verified:
 - make be-fmt
 - make be-test
 Known risks:
-- API names aliased but hidden names can vary.
+- Deck sourcing is caller-provided for purity; host/transport authorization added later.
 Next task:
