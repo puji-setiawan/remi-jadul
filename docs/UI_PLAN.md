@@ -12,6 +12,20 @@ Design direction comes from [`DESIGN.md`](../DESIGN.md): felt-green table, warm 
 
 Design dials: ENERGY 2, RHYTHM 2, MOTION 1.
 
+## Pseudo-3D tabletop requirement
+
+The MVP gameplay table uses pseudo-3D presentation in Flutter rather than a full 3D engine:
+
+- Use perspective transforms for the table plane and player-side meld zones.
+- Use controlled card rotation, elevation, scale, and shadow to communicate depth.
+- Animate draw, discard, pickup, and laydown as physical movement across the table.
+- Keep the deck and discard ring visually centered while the scoreboard panel remains on the right.
+- Preserve readable rank and suit labels at every perspective angle.
+- Do not add free camera rotation, 3D meshes, complex physics, or a Unity/Godot runtime to MVP.
+- Keep card ownership, rules, validation, and outcomes server-authoritative.
+
+The pseudo-3D treatment must remain usable on narrow Android screens and must reduce or disable perspective motion when reduced-motion is enabled.
+
 ## Card asset source
 
 The card direction is an original, scalable vector treatment designed for Remi Jadul:

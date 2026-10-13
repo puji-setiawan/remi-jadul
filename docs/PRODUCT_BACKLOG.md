@@ -15,6 +15,7 @@ Game kartu Remi online Android untuk 2–4 pemain dengan room publik/privat, per
 - Host memulai game saat jumlah pemain yang dipilih tersedia.
 - Server membagikan kartu, menentukan joker, memvalidasi aksi, mengatur giliran, menghitung skor, dan mengakhiri ronde.
 - Match terdiri dari tiga ronde dengan skor kumulatif dan pemenang akhir.
+- Gameplay menggunakan presentasi pseudo-3D tabletop di Flutter dengan perspektif, depth, dan animasi kartu.
 - Draw dari closed deck dan discard pickup sesuai `GAME_RULES.md`.
 - Personalized state projection tanpa membocorkan kartu lawan.
 - Reconnect dasar ke room aktif.
@@ -80,6 +81,7 @@ Game kartu Remi online Android untuk 2–4 pemain dengan room publik/privat, per
 - [ ] Public/private room create and join.
 - [ ] Room waiting state and host start.
 - [ ] Personalized game table and hand.
+- [ ] Pseudo-3D tabletop presentation with card depth, perspective, and movement animation.
 - [ ] Draw, discard, laydown, discard pickup, and close interactions.
 - [ ] Score, game-over, ranking, loading, error, and reconnect states.
 - [ ] Android emulator acceptance flow.
