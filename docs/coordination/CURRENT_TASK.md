@@ -1,4 +1,4 @@
-# Task — Versioned command envelope and action errors
+# Task — Recipient event sequence and stale-event handling
 
 Status: DONE
 Owner: BE
@@ -6,45 +6,45 @@ Priority: P0
 
 ## Goal
 
-Implement the versioned WebSocket command envelope contract and a safe typed action-error model before any transport handler. The package validates envelope shape and request IDs without mutating game state or depending on network I/O.
+Implement pure, transport-independent recipient-stream sequence tracking and stale-event detection for the WebSocket event contract. A recipient stream has monotonic sequence numbers; missed sequences are detected without mutating room or game state.
 
 ## Acceptance criteria
 
-- [ ] Client commands require `version`, `type`, `name`, and `request_id`.
-- [ ] Room-scoped commands require `room_id`.
-- [ ] Unknown or unsupported command names return a typed `invalid_command` error.
-- [ ] Missing required envelope fields return typed validation errors.
-- [ ] Unknown fields are ignored without causing an error.
-- [ ] Action errors include only stable code, safe localized message, and retryability status.
-- [ ] Action errors never contain card IDs, hands, marker identity, deck order, or server-only validation details.
-- [ ] Request IDs can be retained and compared for idempotency lookup in later slices.
-- [ ] Table-driven tests cover valid commands, missing fields, unknown names, `room_id` requirements, unknown fields, and hidden-data absence.
+- [ ] Each recipient stream starts at a documented initial sequence.
+- [ ] Each delivered event receives the next monotonic sequence number.
+- [ ] A private event delivered to one recipient consumes a sequence only in that recipient’s stream.
+- [ ] A detected sequence gap reports the last received sequence and latest server sequence without mutating state.
+- [ ] An event at or below the last received recipient sequence is marked stale and ignored.
+- [ ] Receiving all expected sequences never reports a gap.
+- [ ] A new snapshot resets the recipient stream’s last received sequence to the server stream’s latest sequence.
+- [ ] Sequence state is safe to use independently per room and per recipient.
+- [ ] Table-driven tests cover first sequence, consecutive events, gap, stale event, per-recipient streams, and snapshot reset.
 - [ ] `make be-fmt` and `make be-test` pass.
 
 ## Allowed files/packages
 
-- `server/internal/transport/...`
+- `server/internal/realtime/...`
 
 ## Out of scope
 
-- HTTP/WebSocket upgrade, connection authentication, and routing.
-- Guest creation, JWT, and persistence.
-- State mutation, command business validation, and game actions.
-- Event sequence/order, reconnect, resync, and broadcast projections.
-- Protocol document changes; `docs/protocol/` remains the contract source.
+- Network/WebSocket upgrade, connection authentication, and I/O.
+- Command acceptance, action validation, and game-state mutation.
+- Reconnect HTTP/WebSocket handling and snapshot transport.
+- REST endpoints, guest identity, and persistence.
+- Changes to documented protocol rules or sequence allocation.
 
 ## Dependencies and decisions
 
 - Rules/decision records: `docs/decisions/0011-protocol-v1-contract.md`.
-- Protocol docs: `docs/protocol/envelope.md`, `docs/protocol/errors.md`, `docs/protocol/commands.md`.
-- Architecture: `docs/ARCHITECTURE.md` backend modules (`internal/transport`).
-- Product scope: `docs/PRODUCT_BACKLOG.md` Phase 3 action errors and request IDs.
-- Previous slices: game engine, guest identity, room lifecycle, host start, and personalized projection.
+- Protocol docs: `docs/protocol/envelope.md`, `docs/protocol/contract.md`, `docs/protocol/errors.md`.
+- Architecture: `docs/ARCHITECTURE.md` backend modules (`internal/realtime`).
+- Product scope: `docs/PRODUCT_BACKLOG.md` Phase 3 event sequence/order handling and reconnect/resync behavior.
+- Previous slices: game engine, room lifecycle, host start, personalized projection, and versioned envelope.
 - Blockers: No product decision is currently blocking this slice.
 
 ## Protocol impact
 
-Implements the documented v1 envelope and error model without changing it.
+Implements the documented recipient-stream sequence and stale-event behavior without changing it.
 
 ## Verification
 
@@ -58,10 +58,10 @@ make be-test
 ## Handoff result
 
 Changed:
-- Added versioned command envelope and safe action-error model in server/internal/transport.
+- Added recipient stream sequence tracking and gap/stale/snapshot handling in server/internal/realtime.
 Verified:
 - make be-fmt
 - make be-test
 Known risks:
-- JSON decode fallback accepts unknown fields by ignoring them.
+- Initial/gap semantics based on documented monotonic recipient streams.
 Next task:
