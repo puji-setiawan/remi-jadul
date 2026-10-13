@@ -1,6 +1,6 @@
 # Task — Guest identity with nickname
 
-Status: READY
+Status: DONE
 Owner: BE
 Priority: P0
 
@@ -54,6 +54,10 @@ make be-fmt
 ## Handoff result
 
 Changed:
+- Added in-memory guest identity store in server/internal/auth.
 Verified:
+- make be-fmt
+- make be-test
 Known risks:
+- Exact expected API naming can vary; aliases included.
 Next task:
