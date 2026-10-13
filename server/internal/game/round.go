@@ -34,6 +34,19 @@ type Round struct {
 	JokerRank     Rank
 	Table         Table
 	HasDrawn      bool
+	Status        string
+	Ended         bool
+	GameOver      bool
+	Closed        bool
+	EndReason     string
+	Reason        string
+	ClosePlayer   int
+	Closer        int
+	ClosedBy      int
+	HasClosed     bool
+	Scores        []int
+	RoundScores   []int
+	PlayerScores  []int
 }
 
 // GameState and Game are public aliases for Round.
@@ -82,6 +95,13 @@ func makeRound(players int, hands [][]Card, closedDeck []Card, jokerRank Rank) (
 		JokerRank:     jokerRank,
 		Table:         NewTable(),
 		HasDrawn:      false,
+		Status:        "active",
+		Ended:         false,
+		EndReason:     "",
+		Reason:        "",
+		Scores:        make([]int, players),
+		RoundScores:   make([]int, players),
+		PlayerScores:  make([]int, players),
 		CurrentPlayer: 0,
 	}
 	return round, nil
@@ -186,13 +206,23 @@ func (r *Round) Draw(player int) error {
 		return ErrAlreadyDrawn
 	}
 	if len(r.ClosedDeck) == 0 {
+		next := r.cloneRound()
+		next.Ended = true
+		next.Status = "ended"
+		next.EndReason = "deck_empty"
+		next.Reason = next.EndReason
+		next.Scores = next.scorePlayers(-1, nil, false, -1)
+		next.RoundScores = cloneInts(next.Scores)
+		next.PlayerScores = cloneInts(next.Scores)
+		*r = next
 		return ErrClosedDeckEmpty
 	}
-	next := *r
-	next.Hands = cloneHandsForRound(r.Hands)
+	next := r.cloneRound()
 	card := r.ClosedDeck[0]
 	next.ClosedDeck = clonesCardsForRound(r.ClosedDeck[1:])
-	next.Hands[player] = append(clonesCardsForRound(r.Hands[player]), card)
+	hand := clonesCardsForRound(r.Hands[player])
+	hand = append(hand, card)
+	next.Hands[player] = hand
 	next.HasDrawn = true
 	*r = next
 	return nil
@@ -209,12 +239,29 @@ func (r *Round) Discard(player int, card Card) error {
 	if !r.HasDrawn {
 		return ErrDrawRequired
 	}
-	hand, ok := removeCardFromHand(r.Hands[player], card)
-	if !ok {
+	if _, ok := removeCardFromHand(r.Hands[player], card); !ok {
 		return ErrCardNotInHand
 	}
-	next := *r
-	next.Hands = cloneHandsForRound(r.Hands)
+	if IsJoker(card, r.JokerRank) {
+		next := r.cloneRound()
+		hand, _ := removeCardFromHand(r.Hands[player], card)
+		next.Hands[player] = hand
+		next.DiscardPile = append(clonesCardsForRound(r.DiscardPile), card)
+		next.HasDrawn = false
+		next.Ended = true
+		next.Status = "ended"
+		next.GameOver = true
+		next.EndReason = "game_over"
+		next.Reason = next.EndReason
+		next.Scores = make([]int, r.PlayerCount)
+		next.Scores[player] = -50
+		next.RoundScores = cloneInts(next.Scores)
+		next.PlayerScores = cloneInts(next.Scores)
+		*r = next
+		return nil
+	}
+	next := r.cloneRound()
+	hand, _ := removeCardFromHand(r.Hands[player], card)
 	next.Hands[player] = hand
 	next.DiscardPile = append(clonesCardsForRound(r.DiscardPile), card)
 	next.HasDrawn = false

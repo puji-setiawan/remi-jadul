@@ -12,6 +12,7 @@ var (
 type Combination struct {
 	Kind  CombinationKind
 	Cards []Card
+	Owner int
 }
 
 // LockedCombination, TableCombination, and TableMeld are aliases for public
