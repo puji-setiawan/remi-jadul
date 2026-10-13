@@ -1,0 +1,166 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 1280" role="img" aria-labelledby="title desc">
+  <title id="title">Remi Jadul UI mock</title>
+  <desc id="desc">Wireframe mock of the lobby, room, gameplay, discard pickup, round result, and match result screens.</desc>
+  <defs>
+    <filter id="phone-shadow" x="-20%" y="-10%" width="140%" height="130%">
+      <feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#071f1b" flood-opacity="0.22"/>
+    </filter>
+    <style>
+      .phone { fill: #f7f0df; stroke: #c6a86b; stroke-width: 4; }
+      .screen { fill: #17483f; }
+      .panel { fill: #216054; stroke: #3d8172; stroke-width: 2; }
+      .paper { fill: #fbf6e9; stroke: #d8cdb8; stroke-width: 2; }
+      .red { fill: #a52e39; }
+      .ink { fill: #1d2927; }
+      .gold { fill: #c6a86b; }
+      .muted { fill: #b9d0c6; }
+      .label { font: 700 18px Arial, sans-serif; letter-spacing: 1px; }
+      .body { font: 16px Arial, sans-serif; }
+      .small { font: 13px Arial, sans-serif; }
+      .card-rank { font: 700 22px Georgia, serif; }
+      .card-suit { font: 20px Georgia, serif; }
+    </style>
+  </defs>
+
+  <rect width="1800" height="1280" fill="#efe6d2"/>
+  <text x="70" y="68" font-family="Georgia, serif" font-size="38" font-weight="700" fill="#17483f">Remi Jadul UI mock</text>
+  <text x="70" y="102" class="body" fill="#53655e">Modern tabletop gameplay, narrow Android first</text>
+
+  <g transform="translate(70 150)" filter="url(#phone-shadow)">
+    <rect class="phone" width="360" height="610" rx="28"/>
+    <rect class="screen" x="12" y="12" width="336" height="586" rx="20"/>
+    <text x="34" y="58" class="label" fill="#fbf6e9">REMI JADUL</text>
+    <text x="34" y="88" class="body" fill="#b9d0c6">Permainan kartu di meja</text>
+    <rect class="paper" x="34" y="135" width="292" height="58" rx="12"/>
+    <text x="54" y="170" class="body" fill="#1d2927">Nama pemain</text>
+    <text x="54" y="187" class="small" fill="#7a837b">Masukkan nama Anda</text>
+    <rect x="34" y="224" width="292" height="58" rx="12" fill="#c6a86b"/>
+    <text x="180" y="260" class="label" text-anchor="middle" fill="#1d2927">BUAT ROOM</text>
+    <rect class="panel" x="34" y="306" width="292" height="58" rx="12"/>
+    <text x="180" y="342" class="label" text-anchor="middle" fill="#fbf6e9">GABUNG ROOM</text>
+    <text x="34" y="424" class="label" fill="#c6a86b">ROOM TERSEDIA</text>
+    <rect class="panel" x="34" y="444" width="292" height="54" rx="10"/>
+    <text x="52" y="477" class="body" fill="#fbf6e9">Ruang santai</text>
+    <text x="305" y="477" class="small" text-anchor="end" fill="#b9d0c6">2 / 4</text>
+    <text x="34" y="552" class="small" fill="#b9d0c6">Offline state, error, and reconnect are explicit</text>
+  </g>
+  <text x="250" y="790" class="label" text-anchor="middle" fill="#17483f">01 LOBBY</text>
+
+  <g transform="translate(485 150)" filter="url(#phone-shadow)">
+    <rect class="phone" width="360" height="610" rx="28"/>
+    <rect class="screen" x="12" y="12" width="336" height="586" rx="20"/>
+    <text x="34" y="58" class="label" fill="#fbf6e9">ROOM SANTAI</text>
+    <text x="34" y="88" class="body" fill="#b9d0c6">Kode: JADUL7</text>
+    <rect class="panel" x="34" y="120" width="292" height="70" rx="12"/>
+    <circle cx="65" cy="155" r="18" fill="#c6a86b"/>
+    <text x="99" y="161" class="body" fill="#fbf6e9">Anda</text>
+    <text x="300" y="161" class="small" text-anchor="end" fill="#c6a86b">HOST</text>
+    <rect class="panel" x="34" y="204" width="292" height="70" rx="12"/>
+    <circle cx="65" cy="239" r="18" fill="#8d9e93"/>
+    <text x="99" y="245" class="body" fill="#fbf6e9">Pemain 2</text>
+    <text x="300" y="245" class="small" text-anchor="end" fill="#b9d0c6">SIAP</text>
+    <rect class="panel" x="34" y="288" width="292" height="70" rx="12"/>
+    <circle cx="65" cy="323" r="18" fill="#8d9e93"/>
+    <text x="99" y="329" class="body" fill="#fbf6e9">Kursi kosong</text>
+    <rect class="paper" x="34" y="402" width="292" height="52" rx="12"/>
+    <text x="180" y="435" class="label" text-anchor="middle" fill="#1d2927">PENGATURAN ROOM</text>
+    <rect x="34" y="474" width="292" height="58" rx="12" fill="#c6a86b"/>
+    <text x="180" y="510" class="label" text-anchor="middle" fill="#1d2927">MULAI GAME</text>
+    <text x="34" y="566" class="small" fill="#b9d0c6">Host can start when the chosen seats are filled</text>
+  </g>
+  <text x="665" y="790" class="label" text-anchor="middle" fill="#17483f">02 ROOM</text>
+
+  <g transform="translate(900 150)" filter="url(#phone-shadow)">
+    <rect class="phone" width="360" height="610" rx="28"/>
+    <rect class="screen" x="12" y="12" width="336" height="586" rx="20"/>
+    <text x="30" y="47" class="label" fill="#fbf6e9">RONDE 2 / 3</text>
+    <text x="330" y="47" class="small" text-anchor="end" fill="#c6a86b">GILIRAN ANDA</text>
+    <rect class="panel" x="30" y="64" width="300" height="42" rx="10"/>
+    <text x="46" y="91" class="small" fill="#fbf6e9">Anda 24</text>
+    <text x="314" y="91" class="small" text-anchor="end" fill="#fbf6e9">Lawan 33</text>
+    <text x="180" y="135" class="small" text-anchor="middle" fill="#b9d0c6">LAWAN 1  •  7 KARTU</text>
+    <g transform="translate(141 150)">
+      <rect class="paper" width="34" height="48" rx="5"/>
+      <rect class="paper" x="39" width="34" height="48" rx="5"/>
+      <rect class="paper" x="78" width="34" height="48" rx="5"/>
+    </g>
+    <circle cx="180" cy="292" r="58" fill="#216054" stroke="#c6a86b" stroke-width="3"/>
+    <rect class="paper" x="156" y="260" width="48" height="68" rx="7"/>
+    <text x="180" y="301" class="label" text-anchor="middle" fill="#1d2927">DECK</text>
+    <circle cx="180" cy="292" r="85" fill="none" stroke="#5e9584" stroke-width="2" stroke-dasharray="4 8"/>
+    <text x="180" y="394" class="small" text-anchor="middle" fill="#c6a86b">DISCARD RING</text>
+    <rect class="paper" x="34" y="414" width="54" height="74" rx="8"/>
+    <text x="48" y="444" class="card-rank" fill="#a52e39">A</text><text x="48" y="469" class="card-suit" fill="#a52e39">♥</text>
+    <rect class="paper" x="94" y="414" width="54" height="74" rx="8"/>
+    <text x="108" y="444" class="card-rank" fill="#1d2927">7</text><text x="108" y="469" class="card-suit" fill="#1d2927">♣</text>
+    <rect class="paper" x="154" y="414" width="54" height="74" rx="8"/>
+    <text x="168" y="444" class="card-rank" fill="#a52e39">Q</text><text x="168" y="469" class="card-suit" fill="#a52e39">♦</text>
+    <rect class="paper" x="214" y="414" width="54" height="74" rx="8"/>
+    <text x="228" y="444" class="card-rank" fill="#1d2927">6</text><text x="228" y="469" class="card-suit" fill="#1d2927">♠</text>
+    <rect x="30" y="510" width="300" height="42" rx="10" fill="#c6a86b"/>
+    <text x="180" y="537" class="label" text-anchor="middle" fill="#1d2927">DRAW   AMBIL   BUANG</text>
+    <text x="180" y="580" class="small" text-anchor="middle" fill="#b9d0c6">Joker aktif: rank 6</text>
+  </g>
+  <text x="1080" y="790" class="label" text-anchor="middle" fill="#17483f">03 GAMEPLAY 2 PEMAIN</text>
+
+  <g transform="translate(1315 150)" filter="url(#phone-shadow)">
+    <rect class="phone" width="360" height="610" rx="28"/>
+    <rect class="screen" x="12" y="12" width="336" height="586" rx="20"/>
+    <text x="30" y="47" class="label" fill="#fbf6e9">RONDE 2 / 3</text>
+    <text x="330" y="47" class="small" text-anchor="end" fill="#b9d0c6">MENUNGGU LAWAN</text>
+    <rect class="panel" x="30" y="64" width="300" height="42" rx="10"/>
+    <text x="46" y="91" class="small" fill="#fbf6e9">Anda 24</text><text x="314" y="91" class="small" text-anchor="end" fill="#fbf6e9">P1 33  P2 18  P3 12</text>
+    <text x="180" y="130" class="small" text-anchor="middle" fill="#b9d0c6">P1        P2</text>
+    <g transform="translate(62 142)"><rect class="paper" width="30" height="43" rx="5"/><rect class="paper" x="36" width="30" height="43" rx="5"/><rect class="paper" x="72" width="30" height="43" rx="5"/></g>
+    <g transform="translate(236 142)"><rect class="paper" width="30" height="43" rx="5"/><rect class="paper" x="36" width="30" height="43" rx="5"/><rect class="paper" x="72" width="30" height="43" rx="5"/></g>
+    <circle cx="180" cy="278" r="65" fill="#216054" stroke="#c6a86b" stroke-width="3"/>
+    <rect class="paper" x="157" y="247" width="46" height="65" rx="7"/>
+    <text x="180" y="285" class="label" text-anchor="middle" fill="#1d2927">DECK</text>
+    <circle cx="180" cy="278" r="92" fill="none" stroke="#5e9584" stroke-width="2" stroke-dasharray="4 8"/>
+    <text x="180" y="390" class="small" text-anchor="middle" fill="#c6a86b">SEMUA KARTU PUBLIK</text>
+    <rect class="paper" x="34" y="413" width="54" height="74" rx="8"/><text x="48" y="444" class="card-rank" fill="#a52e39">3</text><text x="48" y="469" class="card-suit" fill="#a52e39">♥</text>
+    <rect class="paper" x="94" y="413" width="54" height="74" rx="8"/><text x="108" y="444" class="card-rank" fill="#1d2927">8</text><text x="108" y="469" class="card-suit" fill="#1d2927">♣</text>
+    <rect class="paper" x="154" y="413" width="54" height="74" rx="8"/><text x="168" y="444" class="card-rank" fill="#a52e39">Q</text><text x="168" y="469" class="card-suit" fill="#a52e39">♦</text>
+    <rect class="paper" x="214" y="413" width="54" height="74" rx="8"/><text x="228" y="444" class="card-rank" fill="#1d2927">6</text><text x="228" y="469" class="card-suit" fill="#1d2927">♠</text>
+    <rect x="30" y="510" width="300" height="42" rx="10" fill="#53655e"/>
+    <text x="180" y="537" class="label" text-anchor="middle" fill="#fbf6e9">MENUNGGU GILIRAN</text>
+    <text x="180" y="580" class="small" text-anchor="middle" fill="#b9d0c6">Papan meja menyesuaikan 4 pemain</text>
+  </g>
+  <text x="1495" y="790" class="label" text-anchor="middle" fill="#17483f">04 GAMEPLAY 4 PEMAIN</text>
+
+  <g transform="translate(270 865)" filter="url(#phone-shadow)">
+    <rect class="phone" width="560" height="330" rx="28"/>
+    <rect class="screen" x="12" y="12" width="536" height="306" rx="20"/>
+    <text x="38" y="52" class="label" fill="#fbf6e9">AMBIL DARI BUANGAN</text>
+    <text x="38" y="78" class="small" fill="#b9d0c6">Pilih kartu dalam 11 posisi terbawah</text>
+    <g transform="translate(38 104)">
+      <rect class="paper" width="52" height="72" rx="8"/><text x="14" y="133" class="small" fill="#c6a86b">bawah</text>
+      <rect class="paper" x="60" width="52" height="72" rx="8"/><rect class="paper" x="120" width="52" height="72" rx="8"/>
+      <rect class="paper" x="180" width="52" height="72" rx="8" stroke="#c6a86b" stroke-width="5"/><text x="194" y="42" class="card-rank" fill="#a52e39">2</text><text x="194" y="65" class="card-suit" fill="#a52e39">♥</text>
+      <rect class="paper" x="240" width="52" height="72" rx="8"/><rect class="paper" x="300" width="52" height="72" rx="8"/><rect class="paper" x="360" width="52" height="72" rx="8"/>
+    </g>
+    <text x="38" y="213" class="body" fill="#fbf6e9">Ikut masuk ke tangan:</text>
+    <text x="230" y="213" class="body" fill="#c6a86b">2♥  10♣  5♥</text>
+    <text x="38" y="244" class="small" fill="#b9d0c6">Pilih dua kartu jago, lalu susun sendiri</text>
+    <rect x="38" y="263" width="164" height="36" rx="9" fill="#53655e"/><text x="120" y="287" class="small" text-anchor="middle" fill="#fbf6e9">BATAL</text>
+    <rect x="218" y="263" width="304" height="36" rx="9" fill="#c6a86b"/><text x="370" y="287" class="small" text-anchor="middle" fill="#1d2927">AMBIL DAN TURUNKAN</text>
+  </g>
+  <text x="550" y="1230" class="label" text-anchor="middle" fill="#17483f">05 PICKUP DISCARD</text>
+
+  <g transform="translate(980 865)" filter="url(#phone-shadow)">
+    <rect class="phone" width="560" height="330" rx="28"/>
+    <rect class="screen" x="12" y="12" width="536" height="306" rx="20"/>
+    <text x="38" y="52" class="label" fill="#fbf6e9">RONDE SELESAI</text>
+    <text x="38" y="82" class="small" fill="#b9d0c6">Tutup valid, skor ditambahkan ke match</text>
+    <rect class="panel" x="38" y="110" width="230" height="104" rx="14"/>
+    <text x="58" y="145" class="body" fill="#b9d0c6">Skor ronde</text>
+    <text x="58" y="190" font-size="42" font-weight="700" fill="#c6a86b">+36</text>
+    <rect class="panel" x="292" y="110" width="230" height="104" rx="14"/>
+    <text x="312" y="145" class="body" fill="#b9d0c6">Total Anda</text>
+    <text x="312" y="190" font-size="42" font-weight="700" fill="#fbf6e9">60</text>
+    <text x="38" y="248" class="body" fill="#fbf6e9">Papan skor diperbarui setelah ronde.</text>
+    <rect x="38" y="266" width="484" height="34" rx="9" fill="#c6a86b"/>
+    <text x="280" y="289" class="small" text-anchor="middle" fill="#1d2927">LANJUT KE RONDE BERIKUTNYA</text>
+  </g>
+  <text x="1260" y="1230" class="label" text-anchor="middle" fill="#17483f">06 HASIL RONDE</text>
+</svg>

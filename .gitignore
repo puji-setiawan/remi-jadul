@@ -1,0 +1,31 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# OpenCode/local agent state
+.opencode/state/
+.opencode/cache/
+
+# Go
+bin/
+coverage.out
+*.test
+
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+
+# IDE and OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Logs and temporary files
+*.log
+tmp/
+temp/

@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 480" role="img" aria-labelledby="title desc">
+  <title id="title">Remi Jadul modern card faces</title>
+  <desc id="desc">Three scalable card face samples: ace of hearts, seven of clubs, and jack of diamonds.</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#071f1b" flood-opacity="0.28"/>
+    </filter>
+    <pattern id="backdrop" width="28" height="28" patternUnits="userSpaceOnUse">
+      <path d="M0 14L14 0M14 28L28 14" stroke="#266256" stroke-width="1" opacity="0.22"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="480" rx="28" fill="#123c35"/>
+  <rect width="1200" height="480" rx="28" fill="url(#backdrop)"/>
+
+  <g font-family="Georgia, 'Times New Roman', serif">
+    <g transform="translate(90 30)" filter="url(#shadow)">
+      <rect width="300" height="420" rx="22" fill="#fbf6e9" stroke="#c6a86b" stroke-width="5"/>
+      <rect x="15" y="15" width="270" height="390" rx="14" fill="none" stroke="#e4d7b8" stroke-width="2"/>
+      <text x="42" y="72" font-size="52" font-weight="700" fill="#a52e39">A</text>
+      <text x="42" y="116" font-size="43" fill="#a52e39">♥</text>
+      <text x="150" y="270" text-anchor="middle" font-size="168" fill="#a52e39">♥</text>
+      <text x="258" y="350" text-anchor="middle" font-size="52" font-weight="700" fill="#a52e39" transform="rotate(180 258 350)">A</text>
+      <text x="258" y="390" text-anchor="middle" font-size="43" fill="#a52e39" transform="rotate(180 258 390)">♥</text>
+    </g>
+
+    <g transform="translate(450 30)" filter="url(#shadow)">
+      <rect width="300" height="420" rx="22" fill="#fbf6e9" stroke="#c6a86b" stroke-width="5"/>
+      <rect x="15" y="15" width="270" height="390" rx="14" fill="none" stroke="#e4d7b8" stroke-width="2"/>
+      <text x="42" y="72" font-size="52" font-weight="700" fill="#1d2927">7</text>
+      <text x="42" y="116" font-size="43" fill="#1d2927">♣</text>
+      <g text-anchor="middle" font-size="54" fill="#1d2927">
+        <text x="100" y="160">♣</text><text x="200" y="160">♣</text>
+        <text x="100" y="230">♣</text><text x="200" y="230">♣</text>
+        <text x="150" y="300">♣</text>
+        <text x="100" y="370">♣</text><text x="200" y="370">♣</text>
+      </g>
+      <text x="258" y="350" text-anchor="middle" font-size="52" font-weight="700" fill="#1d2927" transform="rotate(180 258 350)">7</text>
+      <text x="258" y="390" text-anchor="middle" font-size="43" fill="#1d2927" transform="rotate(180 258 390)">♣</text>
+    </g>
+
+    <g transform="translate(810 30)" filter="url(#shadow)">
+      <rect width="300" height="420" rx="22" fill="#fbf6e9" stroke="#c6a86b" stroke-width="5"/>
+      <rect x="15" y="15" width="270" height="390" rx="14" fill="none" stroke="#e4d7b8" stroke-width="2"/>
+      <text x="42" y="72" font-size="52" font-weight="700" fill="#a52e39">J</text>
+      <text x="42" y="116" font-size="43" fill="#a52e39">♦</text>
+      <path d="M150 95L233 190L150 285L67 190Z" fill="#8f2935"/>
+      <path d="M150 112L215 190L150 268L85 190Z" fill="#c6a86b"/>
+      <path d="M117 145Q150 116 183 145L171 210Q150 228 129 210Z" fill="#fbf6e9"/>
+      <text x="150" y="204" text-anchor="middle" font-size="74" font-weight="700" fill="#8f2935">J</text>
+      <text x="258" y="350" text-anchor="middle" font-size="52" font-weight="700" fill="#a52e39" transform="rotate(180 258 350)">J</text>
+      <text x="258" y="390" text-anchor="middle" font-size="43" fill="#a52e39" transform="rotate(180 258 390)">♦</text>
+    </g>
+  </g>
+</svg>

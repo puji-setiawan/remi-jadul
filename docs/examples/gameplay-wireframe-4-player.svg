@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">Remi Jadul four player gameplay wireframe</title>
+  <desc id="desc">Monochrome line wireframe showing four seats around a table, a deck in the center, a circular discard pile, public melds, hand cards, scoreboard, and actions.</desc>
+  <defs>
+    <style>
+      .line { fill: none; stroke: #202522; stroke-width: 3; }
+      .thin { fill: none; stroke: #202522; stroke-width: 2; }
+      .dash { fill: none; stroke: #202522; stroke-width: 2; stroke-dasharray: 8 7; }
+      .fill { fill: #ffffff; stroke: #202522; stroke-width: 3; }
+      .text { font: 18px Arial, sans-serif; fill: #202522; }
+      .small { font: 14px Arial, sans-serif; fill: #202522; }
+      .title { font: 700 24px Arial, sans-serif; fill: #202522; letter-spacing: 1px; }
+      .bold { font: 700 16px Arial, sans-serif; fill: #202522; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="900" fill="#ffffff"/>
+  <text x="600" y="42" class="title" text-anchor="middle">GAMEPLAY 4 PEMAIN · WIREFRAME</text>
+
+  <!-- Right information and scoreboard panel -->
+  <rect class="fill" x="1035" y="65" width="125" height="650" rx="18"/>
+  <text x="1097" y="103" class="bold" text-anchor="middle">REMI</text>
+  <text x="1097" y="124" class="bold" text-anchor="middle">JADUL</text>
+  <line x1="1055" y1="145" x2="1140" y2="145" class="thin"/>
+  <text x="1055" y="178" class="small">Ronde</text><text x="1140" y="178" class="bold" text-anchor="end">2 / 3</text>
+  <text x="1055" y="210" class="small">Giliran</text><text x="1140" y="210" class="small" text-anchor="end">Anda</text>
+  <text x="1055" y="242" class="small">Status</text><text x="1140" y="242" class="small" text-anchor="end">Online</text>
+  <line x1="1055" y1="265" x2="1140" y2="265" class="thin"/>
+  <text x="1097" y="298" class="bold" text-anchor="middle">SKOR</text>
+  <text x="1055" y="330" class="small">Anda</text><text x="1140" y="330" class="bold" text-anchor="end">24</text>
+  <text x="1055" y="365" class="small">P1</text><text x="1140" y="365" class="bold" text-anchor="end">33</text>
+  <text x="1055" y="400" class="small">P2</text><text x="1140" y="400" class="bold" text-anchor="end">18</text>
+  <text x="1055" y="435" class="small">P3</text><text x="1140" y="435" class="bold" text-anchor="end">12</text>
+  <text x="1097" y="500" class="small" text-anchor="middle">Papan skor</text>
+  <text x="1097" y="522" class="small" text-anchor="middle">kumulatif</text>
+  <text x="1097" y="665" class="small" text-anchor="middle">Info meja</text>
+
+  <!-- Table -->
+  <rect class="line" x="180" y="155" width="840" height="560" rx="110"/>
+  <text x="600" y="181" class="small" text-anchor="middle">MEJA PUBLIK</text>
+
+  <!-- Top player -->
+  <rect class="fill" x="470" y="198" width="260" height="58" rx="10"/>
+  <text x="600" y="224" class="bold" text-anchor="middle">PEMAIN 1</text>
+  <text x="600" y="246" class="small" text-anchor="middle">ONLINE · MENUNGGU</text>
+  <g transform="translate(515 273)">
+    <rect class="thin" width="38" height="54" rx="5"/><rect class="thin" x="46" width="38" height="54" rx="5"/><rect class="thin" x="92" width="38" height="54" rx="5"/><rect class="thin" x="138" width="38" height="54" rx="5"/>
+  </g>
+  <text x="600" y="348" class="small" text-anchor="middle">Meld P1</text>
+  <rect class="thin" x="530" y="358" width="62" height="42" rx="5"/><rect class="thin" x="600" y="358" width="62" height="42" rx="5"/><rect class="thin" x="670" y="358" width="62" height="42" rx="5"/>
+
+  <!-- Left player -->
+  <rect class="fill" x="205" y="390" width="190" height="58" rx="10"/>
+  <text x="300" y="416" class="bold" text-anchor="middle">PEMAIN 2</text>
+  <text x="300" y="438" class="small" text-anchor="middle">ONLINE</text>
+  <g transform="translate(230 470)">
+    <rect class="thin" width="38" height="54" rx="5"/><rect class="thin" x="46" width="38" height="54" rx="5"/><rect class="thin" x="92" width="38" height="54" rx="5"/><rect class="thin" x="138" width="38" height="54" rx="5"/>
+  </g>
+  <text x="300" y="548" class="small" text-anchor="middle">Meld P2</text>
+  <rect class="thin" x="235" y="558" width="62" height="42" rx="5"/><rect class="thin" x="305" y="558" width="62" height="42" rx="5"/>
+
+  <!-- Right player -->
+  <rect class="fill" x="805" y="390" width="190" height="58" rx="10"/>
+  <text x="900" y="416" class="bold" text-anchor="middle">PEMAIN 3</text>
+  <text x="900" y="438" class="small" text-anchor="middle">OFFLINE</text>
+  <g transform="translate(830 470)">
+    <rect class="thin" width="38" height="54" rx="5"/><rect class="thin" x="46" width="38" height="54" rx="5"/><rect class="thin" x="92" width="38" height="54" rx="5"/><rect class="thin" x="138" width="38" height="54" rx="5"/>
+  </g>
+  <text x="900" y="548" class="small" text-anchor="middle">Meld P3</text>
+  <rect class="thin" x="835" y="558" width="62" height="42" rx="5"/><rect class="thin" x="905" y="558" width="62" height="42" rx="5"/>
+
+  <!-- Center deck and discard orbit -->
+  <circle class="dash" cx="600" cy="470" r="124"/>
+  <circle class="dash" cx="600" cy="470" r="82"/>
+  <text x="600" y="380" class="small" text-anchor="middle">DISCARD RING</text>
+  <rect class="fill" x="562" y="432" width="76" height="96" rx="8"/>
+  <text x="600" y="475" class="bold" text-anchor="middle">DECK</text>
+  <text x="600" y="497" class="small" text-anchor="middle">tap deck untuk draw</text>
+  <rect class="thin" x="474" y="442" width="50" height="70" rx="6"/>
+  <rect class="thin" x="726" y="442" width="50" height="70" rx="6"/>
+  <rect class="thin" x="576" y="352" width="50" height="70" rx="6"/>
+  <rect class="thin" x="576" y="518" width="50" height="70" rx="6"/>
+  <text x="600" y="620" class="small" text-anchor="middle">pilih 2 kartu tangan, lalu 1 buangan</text>
+
+  <!-- Current player -->
+  <rect class="fill" x="450" y="642" width="300" height="54" rx="10"/>
+  <text x="600" y="666" class="bold" text-anchor="middle">ANDA · GILIRAN AKTIF</text>
+  <text x="600" y="686" class="small" text-anchor="middle">ONLINE · JOKER RANK 6</text>
+
+  <!-- Hand -->
+  <rect class="fill" x="40" y="735" width="1120" height="92" rx="12"/>
+  <text x="64" y="762" class="bold">TANGAN ANDA</text>
+  <text x="1135" y="762" class="small" text-anchor="end">pilih 2 jago, lalu tap 1 buangan</text>
+  <g transform="translate(270 775)">
+    <rect class="thin" width="54" height="38" rx="5"/><rect class="thin" x="62" width="54" height="38" rx="5"/><rect class="thin" x="124" width="54" height="38" rx="5"/><rect class="thin" x="186" width="54" height="38" rx="5"/><rect class="thin" x="248" width="54" height="38" rx="5"/><rect class="thin" x="310" width="54" height="38" rx="5"/><rect class="thin" x="372" width="54" height="38" rx="5"/>
+  </g>
+
+  <!-- Actions -->
+  <rect class="fill" x="280" y="845" width="250" height="40" rx="8"/><text x="405" y="871" class="bold" text-anchor="middle">TURUNKAN</text>
+  <rect class="fill" x="670" y="845" width="250" height="40" rx="8"/><text x="795" y="871" class="bold" text-anchor="middle">TUTUP</text>
+  <text x="600" y="898" class="small" text-anchor="middle">Tap deck untuk draw. Drag kartu tangan ke discard untuk buang.</text>
+</svg>

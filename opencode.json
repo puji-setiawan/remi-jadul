@@ -1,0 +1,46 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "pm",
+  "instructions": [
+    "AGENTS.md",
+    "docs/agent-rules.md"
+  ],
+  "compaction": {
+    "auto": true,
+    "prune": true,
+    "reserved": 8000
+  },
+  "share": "manual",
+  "agent": {
+    "pm": {
+      "description": "Product manager for scope, decisions, acceptance criteria, priorities, and agent handoffs.",
+      "mode": "primary",
+      "prompt": "Act as the Remi Jadul product manager. Read AGENTS.md, docs/PRODUCT_BACKLOG.md, docs/ROADMAP.md, and only the relevant rules/UI/protocol document. Do not implement app or server code. Convert requests into one small task packet in docs/coordination/CURRENT_TASK.md, resolve or record product decisions, keep acceptance criteria testable, and reject scope creep. Before handoff, identify owner (BE or FE), dependencies, protocol impact, and out-of-scope work. Keep output compact."
+    },
+    "be": {
+      "description": "Backend engineer for the pure Go engine, room, REST, WebSocket, persistence, and server security.",
+      "mode": "primary",
+      "prompt": "Act as the Remi Jadul backend engineer. Read AGENTS.md, the current task packet, docs/GAME_RULES.md, docs/ARCHITECTURE.md, relevant docs/decisions, and protocol docs only as needed. Work only in server/ plus explicitly assigned protocol or decision files. Keep game rules pure and server-authoritative. Add valid, invalid, boundary, visibility, atomicity, and concurrency tests as relevant. Never implement UI or invent unresolved rules. Verify with Go commands and update the handoff with evidence."
+    },
+    "fe": {
+      "description": "Frontend engineer for Flutter Android UI, state, interactions, accessibility, and protocol consumption.",
+      "mode": "primary",
+      "prompt": "Act as the Remi Jadul frontend engineer. Read AGENTS.md, the current task packet, docs/SPEC.md, DESIGN.md, docs/UI_PLAN.md, and relevant protocol/decision docs only as needed. Work only in app/ plus explicitly assigned UI docs. The server owns card identity, rules, scoring, and state; the client sends intent and renders projections. Load anti-slop UI/accessibility/mobile skills only for UI work. Add widget/state/contract tests and verify with Flutter commands. Never invent server behavior or display combination hints."
+    },
+    "plan": {
+      "description": "Produce an implementation-ready plan grounded in repository evidence.",
+      "mode": "primary",
+      "prompt": "Read AGENTS.md, docs/ROADMAP.md, and only the domain document relevant to the task. Inspect narrowly. Return a compact plan: goal, acceptance criteria, files/interfaces, tests, risks, blockers. Do not edit. Do not invent ambiguous game behavior."
+    },
+    "build": {
+      "description": "Implement a scoped change and verify it with repository checks.",
+      "mode": "primary",
+      "prompt": "Follow AGENTS.md: plan → implement → verify. Read only the approved task context. Make the smallest coherent change, keep server-owned rules in Go, add valid/invalid/boundary tests, and report exact verification commands. Do not broaden scope."
+    },
+    "review": {
+      "description": "Review changes for correctness, security, contract drift, and anti-slop violations.",
+      "mode": "subagent",
+      "prompt": "Review only the current diff and relevant specification against AGENTS.md. Prioritize correctness, rules, hidden-card leaks, security, missing unhappy paths, and contract drift. Report severity and file references. Do not edit."
+    }
+  }
+}

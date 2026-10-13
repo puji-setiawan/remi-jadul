@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 360" role="img" aria-labelledby="title desc">
+  <title id="title">Contoh kartu Remi Jadul</title>
+  <desc id="desc">Contoh kartu As hati, tujuh keriting, dan Jack wajik dengan gaya kartu kertas hangat.</desc>
+
+  <rect width="900" height="360" rx="24" fill="#17483f"/>
+
+  <g font-family="Georgia, 'Times New Roman', serif" text-anchor="middle">
+    <!-- Ace of hearts -->
+    <g transform="translate(90 30)">
+      <rect width="210" height="300" rx="14" fill="#f7f0df" stroke="#d8cdb8" stroke-width="3"/>
+      <text x="30" y="48" font-size="34" font-weight="700" fill="#9f2f32">A</text>
+      <text x="30" y="78" font-size="31" fill="#9f2f32">♥</text>
+      <text x="105" y="190" font-size="112" fill="#9f2f32">♥</text>
+      <text x="180" y="270" font-size="34" font-weight="700" fill="#9f2f32" transform="rotate(180 180 270)">A</text>
+      <text x="180" y="300" font-size="31" fill="#9f2f32" transform="rotate(180 180 300)">♥</text>
+    </g>
+
+    <!-- Seven of clubs -->
+    <g transform="translate(345 30)">
+      <rect width="210" height="300" rx="14" fill="#f7f0df" stroke="#d8cdb8" stroke-width="3"/>
+      <text x="30" y="48" font-size="34" font-weight="700" fill="#252525">7</text>
+      <text x="30" y="78" font-size="31" fill="#252525">♣</text>
+      <g font-size="37" fill="#252525">
+        <text x="72" y="105">♣</text><text x="138" y="105">♣</text>
+        <text x="72" y="155">♣</text><text x="138" y="155">♣</text>
+        <text x="105" y="205">♣</text>
+        <text x="72" y="255">♣</text><text x="138" y="255">♣</text>
+      </g>
+      <text x="180" y="270" font-size="34" font-weight="700" fill="#252525" transform="rotate(180 180 270)">7</text>
+      <text x="180" y="300" font-size="31" fill="#252525" transform="rotate(180 180 300)">♣</text>
+    </g>
+
+    <!-- Jack of diamonds -->
+    <g transform="translate(600 30)">
+      <rect width="210" height="300" rx="14" fill="#f7f0df" stroke="#d8cdb8" stroke-width="3"/>
+      <text x="30" y="48" font-size="34" font-weight="700" fill="#9f2f32">J</text>
+      <text x="30" y="78" font-size="31" fill="#9f2f32">♦</text>
+      <path d="M105 104 l42 55 -42 55 -42 -55z" fill="#9f2f32"/>
+      <text x="105" y="184" font-size="74" font-weight="700" fill="#f7f0df">J</text>
+      <text x="180" y="270" font-size="34" font-weight="700" fill="#9f2f32" transform="rotate(180 180 270)">J</text>
+      <text x="180" y="300" font-size="31" fill="#9f2f32" transform="rotate(180 180 300)">♦</text>
+    </g>
+  </g>
+</svg>
