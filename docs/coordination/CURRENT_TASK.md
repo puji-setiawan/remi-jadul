@@ -1,4 +1,4 @@
-# Task — Reconnect snapshot and stale-event resync
+# Task — Visibility and protocol contract assertions
 
 Status: DONE
 Owner: BE
@@ -6,44 +6,45 @@ Priority: P0
 
 ## Goal
 
-Implement pure MVP resynchronization behavior: a reconnect or gap requests a personalized current snapshot, including replacement sequence metadata, without replaying individual events. State mutation only happens for the snapshot replacement, never for stale requests.
+Add executable contract tests proving the implemented projection and envelope models satisfy the documented visibility and safety rules. This slice verifies contract behavior; it does not change rules or network transport.
 
 ## Acceptance criteria
 
-- [ ] A `state.resync` request includes the client’s last received sequence.
-- [ ] The response is a personalized current snapshot rather than an event replay.
-- [ ] The response includes the snapshot, latest server sequence, replaced-since sequence, and `mode: "snapshot"`.
-- [ ] The client’s last received sequence at or below the latest sequence is accepted as stale-handling input.
-- [ ] A gap request does not mutate room, game, hand, or locked-table state.
-- [ ] The snapshot is valid for the requesting recipient only.
-- [ ] Reconnect returns the same personalized projection used for live state.
-- [ ] Table-driven tests cover first reconnect, stale sequence, gap, equal sequence, and projection equivalence.
+- [ ] A contract test asserts that `own_hand` contains only the requesting player’s cards.
+- [ ] A contract test asserts that opponent projections contain `hand_size` and never card IDs, ranks, suits, or joker assignments.
+- [ ] A contract test asserts that the physical joker marker and closed-deck order are absent from projection output.
+- [ ] A contract test asserts that discard pile, locked table combinations, active joker rank, turn, phase, closed deck count, and completed-round scoreboard remain available.
+- [ ] A contract test asserts that action-error payloads contain only code, message, and retryability status.
+- [ ] A contract test asserts that action-error payloads do not expose card details, hands, marker identity, or deck order.
+- [ ] A contract test asserts that reconnect responses preserve the documented projection and replacement sequence metadata.
+- [ ] All contract assertions run without network, database, or clock dependencies.
 - [ ] `make be-fmt` and `make be-test` pass.
 
 ## Allowed files/packages
 
 - `server/internal/realtime/...`
+- `server/internal/transport/...`
 
 ## Out of scope
 
-- HTTP/WebSocket upgrade, connection authentication, and I/O.
-- Command acceptance, action execution, and game mutation.
-- Event persistence/replay and multi-instance recovery.
-- REST guest identity, PostgreSQL, and Flutter integration.
-- Protocol document changes.
+- HTTP/WebSocket upgrade, connection lifecycle, and transport handlers.
+- REST guest identity and session authentication.
+- PostgreSQL persistence and migrations.
+- Flutter contract consumption and presentation.
+- Changes to game rules, protocol docs, or decision records.
 
 ## Dependencies and decisions
 
 - Rules/decision records: `docs/decisions/0011-protocol-v1-contract.md`.
-- Protocol docs: `docs/protocol/contract.md`, `docs/protocol/envelope.md`, `docs/protocol/examples.md`, `docs/protocol/visibility.md`.
-- Architecture: `docs/ARCHITECTURE.md` backend modules (`internal/realtime`).
-- Product scope: `docs/PRODUCT_BACKLOG.md` Phase 3 reconnect and stale-event behavior.
-- Previous slices: personalized projection, envelope, and recipient sequence handling.
+- Protocol docs: `docs/protocol/contract.md`, `docs/protocol/visibility.md`, `docs/protocol/envelope.md`, `docs/protocol/errors.md`.
+- Architecture: `docs/ARCHITECTURE.md` backend modules.
+- Product scope: `docs/PRODUCT_BACKLOG.md` Phase 3 visibility and contract tests.
+- Previous slices: game engine, room, projection, envelope, recipient sequence, and reconnect/resync.
 - Blockers: No product decision is currently blocking this slice.
 
 ## Protocol impact
 
-Implements the documented snapshot-based MVP resync behavior without changing it.
+None. This slice verifies existing documented contracts.
 
 ## Verification
 
@@ -57,10 +58,10 @@ make be-test
 ## Handoff result
 
 Changed:
-- Added reconnect snapshot/resync model in server/internal/realtime.
+- Added executable contract tests in server/internal/realtime and server/internal/transport.
 Verified:
 - make be-fmt
 - make be-test
 Known risks:
-- Snapshot resets recipient stream state only when a stream is provided.
+- Assertions rely on current struct/JSON shapes; hidden contracts may use aliases.
 Next task:
