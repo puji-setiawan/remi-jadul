@@ -7,6 +7,7 @@
 - Flutter SDK compatible with `app/pubspec.yaml`.
 - Android SDK and an emulator for local acceptance testing.
 - Docker and Docker Compose for PostgreSQL and future local services.
+- dbmate for versioned SQL migrations.
 
 Check the local toolchain before assigning an implementation task:
 
@@ -15,6 +16,7 @@ go version
 flutter --version
 dart --version
 docker compose version
+dbmate --version
 ```
 
 The repository does not pin a Flutter channel or Android API level yet. Record those choices in the task packet before starting FE implementation.
@@ -24,6 +26,11 @@ The repository does not pin a Flutter channel or Android API level yet. Record t
 ```bash
 make be-test
 make be-fmt
+make be-run
+make db-up
+make db-migrate
+make db-rollback
+make db-status
 make fe-test
 make fe-analyze
 make check
@@ -40,3 +47,11 @@ Run the focused owner command first. Run `make check` before handoff. If a requi
 5. FE starts after the relevant protocol packet and visibility fixtures are accepted.
 
 Only one task may be `IN_PROGRESS` at a time. Cross-package work requires explicit allowed files and an agreed interface in the task packet.
+
+## Backend stack
+
+- Gin owns REST routing and the WebSocket upgrade boundary.
+- `coder/websocket` owns WebSocket connections after upgrade.
+- GORM with the PostgreSQL driver owns repository queries.
+- dbmate owns SQL schema migrations.
+- JWT owns guest session authentication. Keep `JWT_SECRET` only in local `.env` or deployment secrets.

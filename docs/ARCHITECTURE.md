@@ -29,6 +29,14 @@ server/
 
 The exact package layout may evolve, but the game engine must remain isolated from transport and persistence.
 
+## Backend technology decisions
+
+- Gin handles REST routing and the HTTP upgrade boundary for realtime connections.
+- `coder/websocket` handles WebSocket connections after the Gin upgrade boundary.
+- GORM handles PostgreSQL query and repository mapping outside the pure game engine.
+- `dbmate` owns versioned SQL migrations. GORM `AutoMigrate` is not used for schema management.
+- JWT authenticates guest sessions. JWT claims identify the guest and include issuer and expiry; the token secret remains environment-only.
+
 ## Authority and data flow
 
 ```text

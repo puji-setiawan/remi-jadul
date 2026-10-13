@@ -17,7 +17,7 @@ BE and FE need one explicit contract before room and realtime implementation. Th
 - `request_id` is idempotent across the authenticated guest session for every client command, including room creation before a room exists. REST guest creation uses an `Idempotency-Key` header. Repeating an accepted or rejected request returns the original result without executing twice. Reusing an ID with a different payload returns `invalid_request`.
 - Server events use monotonic per-recipient room-stream sequence numbers. Private events do not create gaps for recipients that did not receive them. Clients resync using their last received sequence after a gap or reconnect.
 - Resync returns a full personalized snapshot for MVP instead of replaying individual events.
-- Guest identity is created through REST; the WebSocket handshake authenticates the returned opaque session token and does not repeat identity creation.
+- Guest identity is created through REST; the WebSocket handshake authenticates the returned JWT and does not repeat identity creation.
 - The WebSocket upgrade authenticates with an `Authorization: Bearer` header. REST requests use optional `X-Request-ID`; guest creation additionally requires `Idempotency-Key`.
 - Repeating guest creation with the same idempotency key and body replays the original response. Reusing the key with a different body returns `409 invalid_request`.
 - Guest creation idempotency records are retained for 24 hours; reuse after expiry is a new request.

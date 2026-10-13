@@ -92,13 +92,13 @@ Response `201`:
   "request_id": "req_guest_01",
   "guest_id": "guest_123",
   "display_name": "Raka",
-  "session_token": "opaque-session-token"
+  "access_token": "jwt-access-token"
 }
 ```
 
-The client sends the session token in the WebSocket upgrade `Authorization: Bearer <session_token>` header. Tokens are opaque, must not be placed in a URL, and must not be logged.
+The client sends the JWT in the WebSocket upgrade `Authorization: Bearer <jwt>` header. JWTs must not be placed in a URL or logged. The JWT issuer and expiry are validated before the connection joins a room.
 
-`guest.identify` is not a WebSocket command. The REST response creates the identity, and the WebSocket authentication handshake uses the returned session token.
+`guest.identify` is not a WebSocket command. The REST response creates the identity, and the WebSocket authentication handshake uses the returned JWT.
 
 ### List public rooms
 
