@@ -1,11 +1,12 @@
 # Events v1
 
-Server events are ordered by `sequence` within a room stream.
+Server events are ordered by `sequence` within each recipient's room stream. Private events do not consume sequence values for other recipients.
+
+Exact payload shapes are defined in [`contract.md`](contract.md), with visibility-safe fixtures in [`examples.md`](examples.md).
 
 | Name | Visibility | Purpose |
 |---|---|---|
-| `guest.identified` | private | Confirms guest identity.
-| `room.updated` | room | Membership, host, room status, and capacity.
+| `room.updated` | personalized | Membership, host, room status, capacity, and recipient-safe private room fields.
 | `game.started` | personalized | Starts a round with private hand projection.
 | `game.state` | personalized | Accepted state projection after an action.
 | `game.drawn` | personalized | Draw result; only the drawing player receives the card identity.

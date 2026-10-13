@@ -2,11 +2,11 @@
 
 Commands express player intent. They never contain an authoritative hand, score, turn, or full state replacement.
 
+Exact payload shapes and retry behavior are defined in [`contract.md`](contract.md); examples are in [`examples.md`](examples.md).
+
 | Name | Payload | Result |
 |---|---|---|
-| `guest.identify` | nickname | guest identity event/error |
 | `room.create` | visibility, player count | room state |
-| `room.list` | optional filters | public room list |
 | `room.join` | room ID or private code | room state |
 | `room.leave` | none | room state |
 | `game.start` | none | game started/state |

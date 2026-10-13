@@ -1,6 +1,6 @@
 .PHONY: check be-test be-fmt fe-test fe-analyze
 
-check: be-test fe-test fe-analyze
+check: be-fmt be-test fe-test fe-analyze
 
 be-test:
 	cd server && go test ./...

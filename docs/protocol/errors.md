@@ -21,5 +21,8 @@ Required initial codes:
 - `stale_request`
 - `sequence_gap`
 - `game_over`
+- `unknown_message`
 
 Errors must not disclose another player’s cards, the marker card, closed-deck order, or server-only validation details.
+
+An unknown command or event name uses `protocol.error` with code `unknown_message`. It includes the received name only when that name is safe to echo and never mutates room state.

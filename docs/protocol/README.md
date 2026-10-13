@@ -2,6 +2,8 @@
 
 This directory is the source of truth for client/server wire contracts. It becomes mandatory before room/realtime implementation begins.
 
+Exact JSON shapes are defined in [`contract.md`](contract.md). Review fixtures are in [`examples.md`](examples.md), and the accepted transport/retry decision is [`../decisions/0011-protocol-v1-contract.md`](../decisions/0011-protocol-v1-contract.md).
+
 ## Ownership
 
 - Go defines and validates the authoritative command/event behavior.
@@ -33,11 +35,12 @@ The exact JSON names are to be fixed in the first protocol decision record befor
 - Public game state includes every locked table combination from every player, so clients can display all public cards when estimating draw possibilities.
 - Events are ordered and reconnect can identify stale or missing sequence numbers.
 - REST and WebSocket contracts use explicit versioning.
+- Accepted command request IDs are idempotent per player and match.
 
 ## Required contract groups
 
-- Guest identity and nickname.
-- Create/list/join/leave room.
+- Guest identity and nickname through REST.
+- Create/join/leave room through WebSocket; public room discovery through REST.
 - Start game.
 - Draw closed deck.
 - Take an eligible discard and the cards above it with exactly one immediate jago combination.

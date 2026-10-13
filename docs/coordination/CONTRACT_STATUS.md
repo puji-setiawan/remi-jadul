@@ -2,9 +2,9 @@
 
 ## Current vertical slice
 
-Status: NOT STARTED
+Status: DOCUMENTED, CONTRACT TESTS NOT IMPLEMENTED
 
-The first shared slice is room identity and state projection. Before it starts, BE and FE must agree on the exact JSON shapes in `docs/protocol/` and add contract fixtures.
+The exact v1 JSON shapes, REST boundary, retry semantics, visibility rules, and review fixtures are documented. Before the first shared slice starts, BE and FE must add executable contract fixtures and agree on the serialized implementation types.
 
 ## Rules
 
@@ -18,4 +18,4 @@ The first shared slice is room identity and state projection. Before it starts, 
 - Example JSON for each command/event.
 - Error examples for invalid turn, stale request, unknown card, and hidden-data violation.
 - Visibility matrix for own hand, opponent hand count, discard pile, table combinations, joker rank, scoreboard, and deck order.
-- Sequence/reconnect behavior.
+- Per-recipient sequence/reconnect behavior and the snapshot-based MVP resync semantics.

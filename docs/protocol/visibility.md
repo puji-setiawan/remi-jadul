@@ -13,4 +13,6 @@
 | Completed-round cumulative scores | yes | yes | yes |
 | Current uncommitted hand score | private if needed | no | no |
 
+Room updates are personalized projections. A private room code is never included in a broadcast payload; it is returned only to the creating host or the player who joined with that code.
+
 Contract tests must assert both allowed fields and forbidden-field absence.
