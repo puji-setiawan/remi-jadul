@@ -300,11 +300,27 @@ func (r *Registry) Get(id string) (Room, bool) {
 	return copyRoom, true
 }
 func (r *Registry) GetRoom(id string) (Room, bool) { return r.Get(id) }
-func (r *Registry) Lookup(id string) (Room, bool)  { return r.Get(id) }
-func (r *Registry) Find(id string) (Room, bool)    { return r.Get(id) }
-func (r *Registry) Room(id string) (Room, bool)    { return r.Get(id) }
-func (r *Registry) ByID(id string) (Room, bool)    { return r.Get(id) }
-func (r *Registry) ById(id string) (Room, bool)    { return r.Get(id) }
+func (r *Registry) FindByAccessCode(code string) (Room, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, room := range r.rooms {
+		if room.AccessCode == code && room.Visibility == "private" {
+			copyRoom := *room
+			copyRoom.syncFields()
+			return copyRoom, true
+		}
+	}
+	return Room{}, false
+}
+func (r *Registry) RoomByCode(code string) (Room, bool)     { return r.FindByAccessCode(code) }
+func (r *Registry) FindRoomByCode(code string) (Room, bool) { return r.FindByAccessCode(code) }
+func (r *Registry) LookupByCode(code string) (Room, bool)   { return r.FindByAccessCode(code) }
+
+func (r *Registry) Lookup(id string) (Room, bool) { return r.Get(id) }
+func (r *Registry) Find(id string) (Room, bool)   { return r.Get(id) }
+func (r *Registry) Room(id string) (Room, bool)   { return r.Get(id) }
+func (r *Registry) ByID(id string) (Room, bool)   { return r.Get(id) }
+func (r *Registry) ById(id string) (Room, bool)   { return r.Get(id) }
 
 func (r *Registry) getRoomPtr(id string) (*Room, bool) {
 	r.mu.Lock()
