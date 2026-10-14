@@ -1,4 +1,4 @@
-# Task — Authenticated connection registry and personalized broadcast
+# Task — WebSocket host start and game.started broadcast
 
 Status: DONE
 Owner: BE
@@ -6,46 +6,51 @@ Priority: P0
 
 ## Goal
 
-Implement an in-memory, thread-safe registry of authenticated WebSocket connections and a personalized broadcast primitive. The slice adds delivery plumbing only; it does not execute commands or mutate game/room state.
+Implement the authenticated `game.start` command. The host starts a waiting room with 2–4 players; the server generates and shuffles the deck server-side, creates the active round through the game engine, and broadcasts a personalized `game.started` event to connected room members.
 
 ## Acceptance criteria
 
-- [x] A connection can be registered with guest ID, recipient stream, and connection metadata.
-- [x] A connection can be unregistered by guest ID or registration token.
-- [x] Registering the same guest replacement does not leave duplicate active connections.
-- [x] A broadcast helper delivers a personalized payload to each requested recipient.
-- [x] A missing recipient is skipped without aborting delivery to other recipients.
-- [x] Registry operations are safe for concurrent use.
-- [x] Registry state does not expose card IDs, hand contents, marker identity, or deck order.
-- [x] Table-driven tests cover register, unregister, duplicate replacement, missing recipient, and concurrent access.
-- [x] `make be-fmt` and `go vet ./...` pass.
+- [x] Only the room host can successfully issue `game.start {}`.
+- [x] `game.start` is rejected when the room is not waiting, already started, or has fewer than 2 members.
+- [x] The server generates the standard 52-card deck and applies server-side randomness; clients never supply deck order or hands.
+- [x] A successful start creates an active round and returns a personalized `game.started` event to the sender.
+- [x] Every connected member of the room receives the personalized `game.started` event.
+- [x] Each recipient receives only the sender-visible fields: own hand, hand counts, active joker rank, discard pile, table, turn/phase, closed deck count, scoreboard.
+- [x] `game.started` does not expose opponent cards, marker identity, or deck order.
+- [x] Rejected starts leave room, round, and recipient connection state unchanged.
+- [x] Typed command errors are returned for unauthorized or invalid start conditions.
+- [x] HTTP/WebSocket table-driven tests cover host start, non-host rejection, insufficient players, already-started rejection, and broadcast delivery.
+- [x] `make be-fmt`, `make be-test`, `go vet ./...`, and `go test -race ./...` pass.
 
 ## Allowed files/packages
 
+- `server/cmd/api/...`
 - `server/internal/transport/...`
+- `server/internal/room/...`
+- `server/internal/game/...`
 - `server/internal/realtime/...`
 
 ## Out of scope
 
-- Command routing and game-state mutation.
-- Room creation, join, leave, and host start.
-- Live round broadcast integration.
-- Reconnect and resync transport delivery.
-- Persistence, REST endpoints, and Flutter integration.
+- Gameplay commands: draw, discard, laydown, take discard, close.
+- Active-joker discard, close validation, and scoring broadcasts.
+- Reconnect round-trip delivery beyond an initial snapshot response path.
+- Match result persistence and completed match history.
+- Flutter integration.
 - Changes to documented rules, decisions, or roadmaps.
 
 ## Dependencies and decisions
 
-- Rules/decision records: `docs/decisions/0011-protocol-v1-contract.md`.
-- Protocol docs: `docs/protocol/contract.md`, `docs/protocol/envelope.md`, `docs/protocol/visibility.md`.
-- Architecture: `docs/ARCHITECTURE.md` realtime and transport boundaries.
-- Product scope: `docs/PRODUCT_BACKLOG.md` Phase 3 personalized projections and reconnect UX.
-- Previous slices: authenticated gateway, projection, sequence, reconnect handling, and room commands.
-- Blockers: No product decision is currently blocking this slice. Thread-safety expectations are infrastructure-level, not game rule behavior.
+- Rules/decision records: `docs/decisions/0001-mvp-baseline.md`, `docs/decisions/0002-rules-determinism.md`, `docs/decisions/0004-three-round-match.md`, `docs/decisions/0011-protocol-v1-contract.md`.
+- Protocol docs: `docs/protocol/contract.md`, `docs/protocol/commands.md`, `docs/protocol/events.md`, `docs/protocol/envelope.md`, `docs/protocol/visibility.md`.
+- Architecture: `docs/ARCHITECTURE.md` authority, realtime, transport, and room boundaries.
+- Product scope: `docs/PRODUCT_BACKLOG.md` Phase 3 active game protocol and Phase 2 host start.
+- Previous slices: room lifecycle, host start, game engine, personalized projection, authenticated connection registry, and personalized broadcast.
+- Blockers: No product decision is currently blocking this slice. Server-side deck entropy must live outside the pure game engine.
 
 ## Protocol impact
 
-Supports the documented per-recipient sequence and personalized delivery model without changing contract shapes.
+Implements the documented `game.start` command and `game.started` event without changing their shapes.
 
 ## Verification
 
@@ -55,17 +60,18 @@ Expected commands:
 make be-fmt
 make be-test
 (cd server && go vet ./...)
+(cd server && go test -race ./...)
 ```
 
 ## Handoff result
 
 Changed:
-- Added thread-safe authenticated connection registry in server/internal/transport.
+- Added authenticated game.start command and personalized game.started broadcast.
 Verified:
 - make be-fmt
 - make be-test
 - go vet ./...
 - go test -race ./...
 Known risks:
-- Personalized delivery uses caller-provided sender; no network broadcast integrated yet.
+- Server-side deck uses math/rand with time seed.
 Next task:

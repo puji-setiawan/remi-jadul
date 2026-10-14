@@ -38,6 +38,7 @@ func TestGatewayRoomCreateJoinLeave(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, _, _ = conn.Read(context.Background())
 	var created map[string]interface{}
 	json.Unmarshal(data, &created)
 	payload := created["payload"].(map[string]interface{})
