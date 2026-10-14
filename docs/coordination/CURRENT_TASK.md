@@ -1,77 +1,63 @@
-# Task — WebSocket host start and game.started broadcast
+# Task — Persistence integration tests
 
-Status: DONE
+Status: READY
 Owner: BE
-Priority: P0
+Priority: P1
 
 ## Goal
 
-Implement the authenticated `game.start` command. The host starts a waiting room with 2–4 players; the server generates and shuffles the deck server-side, creates the active round through the game engine, and broadcasts a personalized `game.started` event to connected room members.
+Add database-backed integration tests for the PostgreSQL guest and completed match repositories. The tests verify migration-backed round trips without changing application runtime behavior.
 
 ## Acceptance criteria
 
-- [x] Only the room host can successfully issue `game.start {}`.
-- [x] `game.start` is rejected when the room is not waiting, already started, or has fewer than 2 members.
-- [x] The server generates the standard 52-card deck and applies server-side randomness; clients never supply deck order or hands.
-- [x] A successful start creates an active round and returns a personalized `game.started` event to the sender.
-- [x] Every connected member of the room receives the personalized `game.started` event.
-- [x] Each recipient receives only the sender-visible fields: own hand, hand counts, active joker rank, discard pile, table, turn/phase, closed deck count, scoreboard.
-- [x] `game.started` does not expose opponent cards, marker identity, or deck order.
-- [x] Rejected starts leave room, round, and recipient connection state unchanged.
-- [x] Typed command errors are returned for unauthorized or invalid start conditions.
-- [x] HTTP/WebSocket table-driven tests cover host start, non-host rejection, insufficient players, already-started rejection, and broadcast delivery.
-- [x] `make be-fmt`, `make be-test`, `go vet ./...`, and `go test -race ./...` pass.
+- [ ] Guest repository integration tests create, load, and reject unknown guest IDs.
+- [ ] Completed match repository integration tests save and load a match, players, and round scores.
+- [ ] Game-over result tests store and retrieve a not-calculated round score as nullable.
+- [ ] Integration tests are skipped or marked clearly unavailable when PostgreSQL is not configured.
+- [ ] Successful tests verify both create/load results.
+- [ ] Repository changes are not made solely to make tests pass.
+- [ ] `make be-fmt`, `go vet ./...`, and `go test ./...` pass when the database is available.
+- [ ] Race tests do not require a database when skipping integration tests.
 
 ## Allowed files/packages
 
-- `server/cmd/api/...`
-- `server/internal/transport/...`
-- `server/internal/room/...`
-- `server/internal/game/...`
-- `server/internal/realtime/...`
+- `server/internal/persistence/...`
 
 ## Out of scope
 
-- Gameplay commands: draw, discard, laydown, take discard, close.
-- Active-joker discard, close validation, and scoring broadcasts.
-- Reconnect round-trip delivery beyond an initial snapshot response path.
-- Match result persistence and completed match history.
+- Runtime persistence wiring into active room/game commands.
+- REST and WebSocket endpoint changes.
+- Match lifecycle or scoring rule changes.
 - Flutter integration.
+- Migration updates.
 - Changes to documented rules, decisions, or roadmaps.
 
 ## Dependencies and decisions
 
-- Rules/decision records: `docs/decisions/0001-mvp-baseline.md`, `docs/decisions/0002-rules-determinism.md`, `docs/decisions/0004-three-round-match.md`, `docs/decisions/0011-protocol-v1-contract.md`.
-- Protocol docs: `docs/protocol/contract.md`, `docs/protocol/commands.md`, `docs/protocol/events.md`, `docs/protocol/envelope.md`, `docs/protocol/visibility.md`.
-- Architecture: `docs/ARCHITECTURE.md` authority, realtime, transport, and room boundaries.
-- Product scope: `docs/PRODUCT_BACKLOG.md` Phase 3 active game protocol and Phase 2 host start.
-- Previous slices: room lifecycle, host start, game engine, personalized projection, authenticated connection registry, and personalized broadcast.
-- Blockers: No product decision is currently blocking this slice. Server-side deck entropy must live outside the pure game engine.
+- Rules/decision records: `docs/decisions/0001-mvp-baseline.md`, `docs/decisions/0013-backend-stack.md`.
+- Architecture: `docs/ARCHITECTURE.md` PostgreSQL, migration, and repository boundaries.
+- Schemas: guest and completed result migrations.
+- Product scope: `docs/PRODUCT_BACKLOG.md` Phase 4 persistence integration tests.
+- Previous slices: guest repository, completed result repository, and result migration.
+- Blockers: A running PostgreSQL instance and valid `DATABASE_URL` are required; otherwise tests skip integration assertions.
 
 ## Protocol impact
 
-Implements the documented `game.start` command and `game.started` event without changing their shapes.
+None.
 
 ## Verification
 
 Expected commands:
 
 ```text
-make be-fmt
-make be-test
-(cd server && go vet ./...)
-(cd server && go test -race ./...)
+make db-migrate
+go test ./...
+go test -race ./...
 ```
 
 ## Handoff result
 
 Changed:
-- Added authenticated game.start command and personalized game.started broadcast.
 Verified:
-- make be-fmt
-- make be-test
-- go vet ./...
-- go test -race ./...
 Known risks:
-- Server-side deck uses math/rand with time seed.
 Next task:

@@ -156,6 +156,11 @@ func pickupImpl(r *Round, player int, args []interface{}) error {
 	finalCards = append(finalCards, parsed.basis...)
 	finalCards = append(finalCards, parsed.extensions...)
 	if !(IsValidSeri(finalCards, r.JokerRank) || IsValidParalel(finalCards, r.JokerRank)) {
+		limit := r.HandLimit()
+		if limit > 0 && len(r.Hands[player])+len(suffix) > limit {
+			_ = r.EndRoundGameOver(player)
+			return nil
+		}
 		return ErrInvalidJago
 	}
 	// Mutate
