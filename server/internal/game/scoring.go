@@ -146,7 +146,7 @@ func bestIntervalScore(indices []int, cards []Card, jokerRank Rank, kind Combina
 				naturalSet[c.Rank] = struct{}{}
 			}
 			score := 0
-			for i := 0; i < n; i++ {
+			for i := range n {
 				rank := Rank(int(start) + i)
 				if _, ok := naturalSet[rank]; ok {
 					// find corresponding card value (rank value, same)
@@ -306,7 +306,7 @@ func partitionKey(combinations []Combination, uncombined []Card) string {
 		uncombinedIDs[i] = cardIDToIntForSort(c.ID)
 	}
 	sort.Ints(uncombinedIDs)
-	key += fmt.Sprintf("|u")
+	key += "|u"
 	for _, id := range uncombinedIDs {
 		key += fmt.Sprintf(",%d", id)
 	}
