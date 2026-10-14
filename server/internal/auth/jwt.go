@@ -150,9 +150,6 @@ func validateJWTConfig(args []interface{}) JWTConfig {
 			}
 		case *GuestStore:
 			store = v
-		case GuestStore:
-			gs := v
-			store = &gs
 		case string:
 			if cfg.effectiveSecret() == "" {
 				cfg.Secret = v
