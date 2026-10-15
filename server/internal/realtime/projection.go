@@ -306,6 +306,9 @@ func buildProjection(args ...interface{}) (GameStateProjection, error) {
 				DisplayName:     member,
 				CumulativeScore: 0,
 			}
+			if r.Match != nil && i < len(r.Match.CumulativeScores) {
+				entry.CumulativeScore = r.Match.CumulativeScores[i]
+			}
 			if displayNames != nil {
 				if n, ok := displayNames[member]; ok && n != "" {
 					entry.DisplayName = n
@@ -347,7 +350,7 @@ func buildProjection(args ...interface{}) (GameStateProjection, error) {
 
 	proj := GameStateProjection{
 		MatchID:                 r.ID,
-		RoundNumber:             1,
+		RoundNumber:             roundNumber(r),
 		RoundCount:              3,
 		RoundStatus:             status,
 		EndReason:               endReason,
@@ -376,6 +379,13 @@ func currentPlayerID(r *room.Room, g *game.Round) string {
 		return r.Members[0]
 	}
 	return ""
+}
+
+func roundNumber(r *room.Room) int {
+	if r.Match != nil && r.Match.RoundNumber > 0 {
+		return r.Match.RoundNumber
+	}
+	return 1
 }
 
 func cardProjection(c game.Card, jokerRank game.Rank) CardProjection {

@@ -1,6 +1,11 @@
 package room
 
-import "testing"
+import (
+	"errors"
+	"testing"
+
+	"remi-jadul/server/internal/game"
+)
 
 func TestRoomLifecycle(t *testing.T) {
 	reg := NewRegistry()
@@ -79,4 +84,41 @@ func TestRoomLifecycle(t *testing.T) {
 		t.Fatal("empty room not removed")
 	}
 	// no mutation on rejection (capacity case already didn't mutate full)
+}
+
+func TestApplyRoundTransitionRestoresExistingMatchOnCallbackFailure(t *testing.T) {
+	reg := NewRegistry()
+	rm, err := reg.CreatePublicRoom(2, "host")
+	if err != nil {
+		t.Fatal(err)
+	}
+	match := game.NewMatch(2)
+	match.RoundNumber = 2
+	match.CumulativeScores = []int{7, 11}
+	if err := reg.SetMatch(rm.ID, match); err != nil {
+		t.Fatal(err)
+	}
+	oldNext, err := game.NewRound(2, [][]game.Card{{}, {}}, nil, game.Rank5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantErr := errors.New("next-round setup failed")
+	if err := reg.ApplyRoundTransition(rm.ID, oldNext, func(stored *Room) error {
+		stored.Match.RoundNumber = 3
+		stored.Match.CumulativeScores[0] = 99
+		stored.Match.Ended = true
+		return wantErr
+	}); !errors.Is(err, wantErr) {
+		t.Fatalf("transition error=%v, want %v", err, wantErr)
+	}
+	got, ok := reg.Get(rm.ID)
+	if !ok || got.Match != match {
+		t.Fatalf("match pointer changed: got=%p want=%p", got.Match, match)
+	}
+	if match.RoundNumber != 2 || match.Ended || match.CumulativeScores[0] != 7 {
+		t.Fatalf("match was not rolled back: %#v", match)
+	}
+	if got.Round != nil {
+		t.Fatalf("round installed after failed transition: %#v", got.Round)
+	}
 }

@@ -54,3 +54,28 @@ func TestConnectionRegistryConcurrent(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestConnectionRoomContextConcurrentWithReplacement(t *testing.T) {
+	reg := NewConnectionRegistry()
+	conn := &Connection{GuestID: "g", Token: "t"}
+	reg.Register(conn)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(2)
+		go func(i int) {
+			defer wg.Done()
+			conn.setRoomContext("room", realtime.NewRecipientStream())
+		}(i)
+		go func() {
+			defer wg.Done()
+			conn.clearRoomContext()
+			conn.setRoomContext("room", realtime.NewRecipientStream())
+		}()
+	}
+	wg.Wait()
+	conn.setRoomContext("room", realtime.NewRecipientStream())
+	if roomID, stream := conn.roomContext(); roomID != "room" || stream == nil {
+		t.Fatalf("final room context=(%q, %v)", roomID, stream)
+	}
+}

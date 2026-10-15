@@ -108,6 +108,7 @@ func (r *Registry) StartGame(args ...interface{}) error {
 	room.GameRound = round
 	room.CurrentRound = round
 	room.RoundState = round
+	room.Match = game.NewMatch(playerCount, round)
 	room.syncFields()
 	r.rooms[roomID] = room
 	return nil

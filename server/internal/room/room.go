@@ -79,6 +79,7 @@ type Room struct {
 	GameRound    *game.Round
 	CurrentRound *game.Round
 	RoundState   *game.Round
+	Match        *game.Match
 	AccessCode   string
 	Code         string
 	PrivateCode  string
@@ -87,6 +88,75 @@ type Room struct {
 	MemberIDs    []string
 	PlayerIDs    []string
 	Guests       []string
+}
+
+// SetRound replaces the active round after a completed round. The match
+// pointer is retained so transport code can advance the match without owning
+// game state transitions.
+func (r *Registry) SetRound(id string, round *game.Round) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	rm, ok := r.rooms[id]
+	if !ok {
+		return ErrRoomNotFound
+	}
+	rm.Round, rm.ActiveRound, rm.GameRound, rm.CurrentRound, rm.RoundState = round, round, round, round, round
+	rm.syncFields()
+	return nil
+}
+
+// SetMatch stores the server-owned match alongside the active round.
+func (r *Registry) SetMatch(id string, match *game.Match) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	rm, ok := r.rooms[id]
+	if !ok {
+		return ErrRoomNotFound
+	}
+	rm.Match = match
+	return nil
+}
+
+// ApplyRoundTransition applies a completed-round mutation and installs the
+// next round while holding the registry lock. The callback runs only after
+// the room has been found, so a successful callback cannot be followed by a
+// registry update failure.
+func (r *Registry) ApplyRoundTransition(id string, next *game.Round, apply func(*Room) error) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	rm, ok := r.rooms[id]
+	if !ok {
+		return ErrRoomNotFound
+	}
+	originalMatch := rm.Match
+	var matchSnapshot *game.Match
+	if originalMatch != nil {
+		matchSnapshot = cloneMatch(originalMatch)
+	}
+	if err := apply(rm); err != nil {
+		if originalMatch == nil {
+			rm.Match = nil
+		} else {
+			*originalMatch = *matchSnapshot
+			rm.Match = originalMatch
+		}
+		return err
+	}
+	if next != nil {
+		rm.Round, rm.ActiveRound, rm.GameRound, rm.CurrentRound, rm.RoundState = next, next, next, next, next
+		rm.syncFields()
+	}
+	return nil
+}
+
+func cloneMatch(m *game.Match) *game.Match {
+	if m == nil {
+		return nil
+	}
+	out := *m
+	out.CumulativeScores = append([]int(nil), m.CumulativeScores...)
+	out.Rankings = append([]game.MatchRanking(nil), m.Rankings...)
+	return &out
 }
 
 // Registry stores rooms in memory.

@@ -15,6 +15,7 @@ var (
 
 // Connection represents one authenticated WebSocket connection.
 type Connection struct {
+	mu      sync.RWMutex
 	ID      string
 	Token   string
 	GuestID string
@@ -22,6 +23,30 @@ type Connection struct {
 	Meta    map[string]interface{}
 	// Conn may hold a transport-specific connection object.
 	Conn interface{}
+}
+
+func (c *Connection) clearRoomContext() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.Meta, "room_id")
+	c.Stream = nil
+}
+
+func (c *Connection) setRoomContext(roomID string, stream *realtime.RecipientStream) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.Meta == nil {
+		c.Meta = make(map[string]interface{})
+	}
+	c.Meta["room_id"] = roomID
+	c.Stream = stream
+}
+
+func (c *Connection) roomContext() (string, *realtime.RecipientStream) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	roomID, _ := c.Meta["room_id"].(string)
+	return roomID, c.Stream
 }
 
 // ConnectionRegistry is a thread-safe authenticated connection registry.
@@ -90,6 +115,24 @@ func (r *ConnectionRegistry) UnregisterToken(token string) bool {
 	if current, ok2 := r.byGuest[conn.GuestID]; ok2 && current == token {
 		delete(r.byGuest, conn.GuestID)
 	}
+	return true
+}
+
+// UnregisterIfCurrent removes conn only when it is still the guest's active
+// connection. A failed write from an old connection must not remove a newer
+// connection registered during reconnect.
+func (r *ConnectionRegistry) UnregisterIfCurrent(conn *Connection) bool {
+	if conn == nil {
+		return false
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	token, ok := r.byGuest[conn.GuestID]
+	if !ok || r.byToken[token] != conn {
+		return false
+	}
+	delete(r.byGuest, conn.GuestID)
+	delete(r.byToken, token)
 	return true
 }
 
@@ -163,6 +206,17 @@ func (r *ConnectionRegistry) GetByToken(token string) (*Connection, bool) {
 	defer r.mu.RUnlock()
 	conn, ok := r.byToken[token]
 	return conn, ok
+}
+
+func (r *ConnectionRegistry) GetByConn(target interface{}) (*Connection, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for _, conn := range r.byToken {
+		if conn != nil && conn.Conn == target {
+			return conn, true
+		}
+	}
+	return nil, false
 }
 
 func (r *ConnectionRegistry) Get(args ...interface{}) (*Connection, bool) {

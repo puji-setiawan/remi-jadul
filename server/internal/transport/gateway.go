@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"remi-jadul/server/internal/auth"
@@ -30,7 +31,20 @@ type WebSocketGatewayConfig struct {
 
 // WebSocketGateway is a minimal authenticated WebSocket gateway.
 type WebSocketGateway struct {
-	cfg WebSocketGatewayConfig
+	cfg       WebSocketGatewayConfig
+	mu        sync.Mutex
+	requests  map[string]cachedRequest
+	roomMu    sync.Mutex
+	roomLocks map[string]*sync.Mutex
+	streams   *realtime.StreamManager
+}
+
+type cachedRequest struct {
+	owner       string
+	connection  *websocket.Conn
+	fingerprint string
+	responses   [][]byte
+	ready       chan struct{}
 }
 
 func NewWebSocketGateway(args ...interface{}) *WebSocketGateway {
@@ -91,7 +105,19 @@ func NewWebSocketGateway(args ...interface{}) *WebSocketGateway {
 	if cfg.Connections == nil {
 		cfg.Connections = NewConnectionRegistry()
 	}
-	return &WebSocketGateway{cfg: cfg}
+	return &WebSocketGateway{cfg: cfg, requests: make(map[string]cachedRequest), roomLocks: make(map[string]*sync.Mutex), streams: realtime.NewStreamManager()}
+}
+
+func (g *WebSocketGateway) lockRoom(id string) func() {
+	g.roomMu.Lock()
+	lock := g.roomLocks[id]
+	if lock == nil {
+		lock = &sync.Mutex{}
+		g.roomLocks[id] = lock
+	}
+	g.roomMu.Unlock()
+	lock.Lock()
+	return lock.Unlock
 }
 
 // Alias constructors.
@@ -142,14 +168,44 @@ func (g *WebSocketGateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			break
 		}
+		if c, ok := g.cfg.Connections.GetByConn(conn); ok && c != nil {
+			c.clearRoomContext()
+		}
 		var env CommandEnvelope
 		if err := json.Unmarshal(data, &env); err != nil {
 			g.writeEnvelopeError(conn, ctx, "", NewActionError("invalid_request"))
 			continue
 		}
+		// Attach before idempotency handling as well: request-fingerprint
+		// failures are room-scoped protocol errors when room_id is present.
+		if env.RoomID != "" {
+			if c, ok := g.cfg.Connections.GetByConn(conn); ok && c != nil {
+				c.setRoomContext(env.RoomID, g.streams.Get(env.RoomID, guestID))
+			}
+		}
+		claimed := false
+		var finishRequest func()
+		if env.RequestID != "" {
+			var replay bool
+			replay, finishRequest = g.beginRequest(conn, guestID, env)
+			if replay {
+				continue
+			}
+			claimed = true
+		}
 		if ae := ValidateCommand(env); ae.Code != "" {
 			g.writeEnvelopeError(conn, ctx, env.RequestID, ae)
+			if claimed {
+				finishRequest()
+			}
 			continue
+		}
+		if c, ok := g.cfg.Connections.GetByConn(conn); ok && c != nil {
+			var stream *realtime.RecipientStream
+			if env.RoomID != "" {
+				stream = g.streams.Get(env.RoomID, guestID)
+			}
+			c.setRoomContext(env.RoomID, stream)
 		}
 		switch env.Name {
 		case "room.create":
@@ -170,10 +226,129 @@ func (g *WebSocketGateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			g.handleGameClose(conn, ctx, guestID, env)
 		case "game.take_discard":
 			g.handleGameTakeDiscard(conn, ctx, guestID, env)
+		case "state.resync":
+			g.handleStateResync(conn, ctx, guestID, env)
 		default:
 			g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("invalid_command"))
 		}
+		if claimed {
+			finishRequest()
+		}
 	}
+}
+
+func requestKey(guestID, requestID string) string { return guestID + "\x00" + requestID }
+
+func requestFingerprint(env CommandEnvelope) string {
+	b, _ := json.Marshal(struct {
+		Name, Room string
+		Payload    json.RawMessage
+		Sequence   uint64
+	}{env.Name, env.RoomID, env.Payload, env.Sequence})
+	return string(b)
+}
+
+func (g *WebSocketGateway) beginRequest(conn *websocket.Conn, guestID string, env CommandEnvelope) (bool, func()) {
+	fingerprint := requestFingerprint(env)
+	g.mu.Lock()
+	k := requestKey(guestID, env.RequestID)
+	if req, ok := g.requests[k]; ok {
+		ready := req.ready
+		g.mu.Unlock()
+		if req.fingerprint != fingerprint {
+			g.writeEnvelopeErrorUncached(conn, context.Background(), env.RequestID, NewActionError("invalid_request"))
+			return true, nil
+		}
+		<-ready
+		g.mu.Lock()
+		req = g.requests[k]
+		g.mu.Unlock()
+		for _, response := range req.responses {
+			g.writeReplayResponse(conn, context.Background(), guestID, response)
+		}
+		return true, nil
+	}
+	g.requests[k] = cachedRequest{owner: guestID, connection: conn, fingerprint: fingerprint, ready: make(chan struct{})}
+	g.mu.Unlock()
+	return false, func() {
+		g.mu.Lock()
+		if req, ok := g.requests[k]; ok {
+			close(req.ready)
+		}
+		g.mu.Unlock()
+	}
+}
+
+// writeReplayResponse reuses the accepted wire response without re-running the
+// command. In particular, it must not allocate a new room sequence when a
+// request is retried on a replacement connection.
+func (g *WebSocketGateway) writeReplayResponse(conn *websocket.Conn, ctx context.Context, guestID string, raw []byte) {
+	_ = conn.Write(ctx, websocket.MessageText, raw)
+}
+
+func (g *WebSocketGateway) cacheResponse(conn *websocket.Conn, raw []byte) {
+	var env struct {
+		RequestID string `json:"request_id"`
+	}
+	if json.Unmarshal(raw, &env) != nil || env.RequestID == "" {
+		return
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	owner := ""
+	if c, ok := g.cfg.Connections.GetByConn(conn); ok && c != nil {
+		owner = c.GuestID
+	}
+	if owner != "" {
+		key := requestKey(owner, env.RequestID)
+		if req, exists := g.requests[key]; exists {
+			req.responses = append(req.responses, append([]byte(nil), raw...))
+			g.requests[key] = req
+		}
+		return
+	}
+	// The original connection may have been replaced before its response was
+	// written. The claimed request remains the source of truth for ownership.
+	for key, req := range g.requests {
+		if req.owner == "" || req.connection != conn || !strings.HasSuffix(key, "\x00"+env.RequestID) {
+			continue
+		}
+		req.responses = append(req.responses, append([]byte(nil), raw...))
+		g.requests[key] = req
+		return
+	}
+}
+
+func (g *WebSocketGateway) handleStateResync(conn *websocket.Conn, ctx context.Context, guestID string, env CommandEnvelope) {
+	unlockRoom := g.lockRoom(env.RoomID)
+	defer unlockRoom()
+	rm, ok := g.cfg.Rooms.Get(env.RoomID)
+	if !ok || rm.Round == nil {
+		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("not_found"))
+		return
+	}
+	var p struct {
+		LastReceivedSequence uint64 `json:"last_received_sequence"`
+	}
+	if len(env.Payload) > 0 && json.Unmarshal(env.Payload, &p) != nil {
+		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("invalid_request"))
+		return
+	}
+	c, _ := g.cfg.Connections.GetByConn(conn)
+	stream := realtime.NewRecipientStream()
+	if c != nil {
+		if _, connectionStream := c.roomContext(); connectionStream != nil {
+			stream = connectionStream
+		}
+	}
+	res, err := realtime.Resync(&rm, rm.Round, guestID, p.LastReceivedSequence, stream)
+	if err != nil {
+		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("invalid_request"))
+		return
+	}
+	msg := map[string]interface{}{"version": "v1", "type": "event", "name": "state.resynced", "request_id": env.RequestID, "room_id": rm.ID, "payload": res}
+	raw, _ := json.Marshal(msg)
+	g.writeRaw(conn, ctx, raw, rm.ID)
 }
 
 type roomCreatePayload struct {
@@ -238,6 +413,9 @@ func (g *WebSocketGateway) handleRoomCreate(conn *websocket.Conn, ctx context.Co
 		g.writeEnvelopeError(conn, ctx, env.RequestID, mapRoomError(err))
 		return
 	}
+	if c, ok := g.cfg.Connections.GetByConn(conn); ok && c != nil {
+		c.setRoomContext(roomVal.ID, g.streams.Get(roomVal.ID, guestID))
+	}
 	canSeeCode := vis == "private"
 	g.writeRoomUpdated(conn, ctx, env.RequestID, roomVal, guestID, canSeeCode, []string{code})
 	g.broadcastRoomUpdated(roomVal, map[string]bool{guestID: canSeeCode})
@@ -282,6 +460,15 @@ func (g *WebSocketGateway) handleRoomJoin(conn *websocket.Conn, ctx context.Cont
 		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("not_found"))
 		return
 	}
+	// Joining mutates the same room membership state as leave/start/actions;
+	// serialize the complete lookup, validation, and mutation with them.
+	unlockRoom := g.lockRoom(roomID)
+	defer unlockRoom()
+	rm, found = g.cfg.Rooms.Get(roomID)
+	if !found {
+		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("not_found"))
+		return
+	}
 	joinedWithCode := false
 	if rm.Visibility == "private" {
 		if code == "" {
@@ -319,9 +506,15 @@ func (g *WebSocketGateway) handleGameStart(conn *websocket.Conn, ctx context.Con
 		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("invalid_request"))
 		return
 	}
+	unlockRoom := g.lockRoom(roomID)
+	defer unlockRoom()
 	rm, found := g.cfg.Rooms.Get(roomID)
 	if !found {
 		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("not_found"))
+		return
+	}
+	if rm.Match != nil && rm.Match.Ended {
+		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("invalid_phase"))
 		return
 	}
 	if rm.Host != guestID {
@@ -364,7 +557,7 @@ func (g *WebSocketGateway) handleGameStart(conn *websocket.Conn, ctx context.Con
 			},
 		}
 		raw, _ := json.Marshal(resp)
-		_ = ws.Write(context.Background(), websocket.MessageText, raw)
+		g.writeRaw(ws, context.Background(), raw, "")
 	}
 }
 
@@ -383,6 +576,8 @@ func (g *WebSocketGateway) handleRoomLeave(conn *websocket.Conn, ctx context.Con
 		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("invalid_request"))
 		return
 	}
+	unlockRoom := g.lockRoom(roomID)
+	defer unlockRoom()
 	rm, found := g.cfg.Rooms.Get(roomID)
 	if !found {
 		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("not_found"))
@@ -464,7 +659,7 @@ func (g *WebSocketGateway) writeRoomUpdated(conn *websocket.Conn, ctx context.Co
 		},
 	}
 	raw, _ := json.Marshal(resp)
-	_ = conn.Write(ctx, websocket.MessageText, raw)
+	g.writeRaw(conn, ctx, raw, rm.ID)
 }
 
 func parseVisibilityString(v string) (string, bool) {
@@ -522,6 +717,14 @@ func (g *WebSocketGateway) lookupGuest(id string) (*auth.Guest, error) {
 }
 
 func (g *WebSocketGateway) writeEnvelopeError(conn *websocket.Conn, ctx context.Context, requestID string, ae ActionError) {
+	g.writeEnvelopeErrorWithCache(conn, ctx, requestID, ae, true)
+}
+
+func (g *WebSocketGateway) writeEnvelopeErrorUncached(conn *websocket.Conn, ctx context.Context, requestID string, ae ActionError) {
+	g.writeEnvelopeErrorWithCache(conn, ctx, requestID, ae, false)
+}
+
+func (g *WebSocketGateway) writeEnvelopeErrorWithCache(conn *websocket.Conn, ctx context.Context, requestID string, ae ActionError, cache bool) {
 	wrapped := map[string]interface{}{
 		"version":    "v1",
 		"type":       "error",
@@ -536,8 +739,79 @@ func (g *WebSocketGateway) writeEnvelopeError(conn *websocket.Conn, ctx context.
 			"retryable": ae.Retryable,
 		},
 	}
+	if c, ok := g.cfg.Connections.GetByConn(conn); ok && c != nil {
+		if roomID, _ := c.roomContext(); roomID != "" {
+			wrapped["room_id"] = roomID
+		}
+	}
 	raw, _ := json.Marshal(wrapped)
-	_ = conn.Write(ctx, websocket.MessageText, raw)
+	if cache {
+		g.writeRaw(conn, ctx, raw, "")
+		return
+	}
+	g.writeRawUncached(conn, ctx, raw, "")
+}
+
+// writeRaw assigns a sequence only to room-scoped server messages. The room
+// ID is read from the envelope so callers cannot accidentally use another
+// recipient's sequence stream.
+func (g *WebSocketGateway) writeRaw(conn *websocket.Conn, ctx context.Context, raw []byte, roomID string) error {
+	return g.writeRawWithCache(conn, ctx, raw, roomID, true)
+}
+
+func (g *WebSocketGateway) writeRawUncached(conn *websocket.Conn, ctx context.Context, raw []byte, roomID string) error {
+	return g.writeRawWithCache(conn, ctx, raw, roomID, false)
+}
+
+func (g *WebSocketGateway) writeRawWithCache(conn *websocket.Conn, ctx context.Context, raw []byte, roomID string, cache bool) error {
+	if conn == nil {
+		return fmt.Errorf("transport: websocket connection is nil")
+	}
+	var envelope map[string]interface{}
+	if err := json.Unmarshal(raw, &envelope); err == nil {
+		if roomID == "" {
+			if v, ok := envelope["room_id"].(string); ok {
+				roomID = v
+			}
+		}
+		guestID := ""
+		if c, ok := g.cfg.Connections.GetByConn(conn); ok && c != nil {
+			guestID = c.GuestID
+		}
+		if guestID == "" {
+			guestID = g.requestOwner(conn, envelope["request_id"])
+		}
+		if roomID != "" {
+			if guestID != "" {
+				envelope["sequence"] = g.streams.Get(roomID, guestID).NextSequence()
+				if encoded, err := json.Marshal(envelope); err == nil {
+					raw = encoded
+				}
+			}
+		}
+	}
+	if cache {
+		g.cacheResponse(conn, raw)
+	}
+	return conn.Write(ctx, websocket.MessageText, raw)
+}
+
+func (g *WebSocketGateway) requestOwner(conn *websocket.Conn, requestID interface{}) string {
+	id, ok := requestID.(string)
+	if !ok || id == "" {
+		return ""
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	for key, req := range g.requests {
+		if req.owner != "" && req.connection == conn && strings.HasSuffix(key, "\x00"+id) {
+			// Request IDs are scoped by guest, but the cached request map stores
+			// the owner alongside the fingerprint so reconnects do not depend on
+			// the active connection registry entry.
+			return req.owner
+		}
+	}
+	return ""
 }
 
 func (g *WebSocketGateway) broadcastRoomUpdated(rm room.Room, codeVisible map[string]bool) {
@@ -552,7 +826,7 @@ func (g *WebSocketGateway) broadcastRoomUpdated(rm room.Room, codeVisible map[st
 		}
 		seeCode := codeVisible[member] || member == rm.Host
 		msg := g.roomUpdatedMessage(rm, member, seeCode)
-		_ = ws.Write(context.Background(), websocket.MessageText, msg)
+		g.writeRaw(ws, context.Background(), msg, "")
 	}
 }
 
@@ -625,6 +899,8 @@ func (g *WebSocketGateway) handleGameDraw(conn *websocket.Conn, ctx context.Cont
 		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("invalid_request"))
 		return
 	}
+	unlockRoom := g.lockRoom(roomID)
+	defer unlockRoom()
 	if payload.Source != "" && payload.Source != "closed_deck" {
 		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("invalid_request"))
 		return
@@ -642,6 +918,10 @@ func (g *WebSocketGateway) handleGameDraw(conn *websocket.Conn, ctx context.Cont
 	}
 	if rm.Round == nil {
 		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("game_not_started"))
+		return
+	}
+	if rm.Match != nil && rm.Match.Ended {
+		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("invalid_phase"))
 		return
 	}
 	// current player id
@@ -667,22 +947,25 @@ func (g *WebSocketGateway) handleGameDraw(conn *websocket.Conn, ctx context.Cont
 
 	err := rm.Round.Draw(playerIndex)
 	// Note: Draw mutates rm.Round (pointer shared); rm struct already has pointer.
-	if err != nil && err != game.ErrClosedDeckEmpty {
+	if err != nil {
+		if err == game.ErrClosedDeckEmpty {
+			if err := g.emitRoundLifecycle(roomID, env.RequestID, "deck_empty"); err != nil {
+				g.writeEnvelopeError(conn, ctx, env.RequestID, lifecycleActionError(err))
+			}
+			return
+		}
 		// map
 		ae := NewActionError("invalid_request")
 		if err == game.ErrNotCurrentPlayer {
 			ae = NewActionError("not_your_turn")
 		} else if err == game.ErrAlreadyDrawn {
 			ae = NewActionError("invalid_phase")
-		} else if err == game.ErrClosedDeckEmpty {
-			// handled below
 		} else {
 			ae = NewActionError("invalid_phase")
 		}
 		g.writeEnvelopeError(conn, ctx, env.RequestID, ae)
 		return
 	}
-	endedEmpty := err == game.ErrClosedDeckEmpty
 
 	// send private game.drawn
 	if drawnCard != nil {
@@ -703,7 +986,7 @@ func (g *WebSocketGateway) handleGameDraw(conn *websocket.Conn, ctx context.Cont
 			},
 		}
 		raw, _ := json.Marshal(msg)
-		_ = conn.Write(ctx, websocket.MessageText, raw)
+		g.writeRaw(conn, ctx, raw, rm.ID)
 	}
 
 	// refresh room
@@ -736,9 +1019,8 @@ func (g *WebSocketGateway) handleGameDraw(conn *websocket.Conn, ctx context.Cont
 			},
 		}
 		raw, _ := json.Marshal(resp)
-		_ = ws.Write(context.Background(), websocket.MessageText, raw)
+		g.writeRaw(ws, context.Background(), raw, "")
 	}
-	_ = endedEmpty
 }
 
 func drawCardID(id interface{}) string {
@@ -782,6 +1064,8 @@ func (g *WebSocketGateway) handleGameDiscard(conn *websocket.Conn, ctx context.C
 		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("invalid_request"))
 		return
 	}
+	unlockRoom := g.lockRoom(roomID)
+	defer unlockRoom()
 
 	rm, found := g.cfg.Rooms.Get(roomID)
 	if !found {
@@ -790,6 +1074,10 @@ func (g *WebSocketGateway) handleGameDiscard(conn *websocket.Conn, ctx context.C
 	}
 	if rm.Round == nil {
 		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("game_not_started"))
+		return
+	}
+	if rm.Match != nil && rm.Match.Ended {
+		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("invalid_phase"))
 		return
 	}
 	currentID := ""
@@ -836,6 +1124,12 @@ func (g *WebSocketGateway) handleGameDiscard(conn *websocket.Conn, ctx context.C
 		g.writeEnvelopeError(conn, ctx, env.RequestID, ae)
 		return
 	}
+	if rm.Round.Ended {
+		if err := g.emitRoundLifecycle(roomID, env.RequestID, "game_over"); err != nil {
+			g.writeEnvelopeError(conn, ctx, env.RequestID, lifecycleActionError(err))
+		}
+		return
+	}
 
 	rm2, _ := g.cfg.Rooms.Get(roomID)
 	for _, member := range rm2.Members {
@@ -862,7 +1156,7 @@ func (g *WebSocketGateway) handleGameDiscard(conn *websocket.Conn, ctx context.C
 			},
 		}
 		raw, _ := json.Marshal(resp)
-		_ = ws.Write(context.Background(), websocket.MessageText, raw)
+		g.writeRaw(ws, context.Background(), raw, "")
 	}
 }
 
@@ -888,6 +1182,8 @@ func (g *WebSocketGateway) handleGameLaydown(conn *websocket.Conn, ctx context.C
 		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("invalid_request"))
 		return
 	}
+	unlockRoom := g.lockRoom(roomID)
+	defer unlockRoom()
 	rm, found := g.cfg.Rooms.Get(roomID)
 	if !found {
 		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("not_found"))
@@ -895,6 +1191,10 @@ func (g *WebSocketGateway) handleGameLaydown(conn *websocket.Conn, ctx context.C
 	}
 	if rm.Round == nil {
 		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("game_not_started"))
+		return
+	}
+	if rm.Match != nil && rm.Match.Ended {
+		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("invalid_phase"))
 		return
 	}
 	currentID := ""
@@ -1007,7 +1307,7 @@ func (g *WebSocketGateway) handleGameLaydown(conn *websocket.Conn, ctx context.C
 			},
 		}
 		raw, _ := json.Marshal(resp)
-		_ = ws.Write(context.Background(), websocket.MessageText, raw)
+		g.writeRaw(ws, context.Background(), raw, "")
 	}
 }
 
@@ -1068,6 +1368,8 @@ func (g *WebSocketGateway) handleGameClose(conn *websocket.Conn, ctx context.Con
 		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("invalid_request"))
 		return
 	}
+	unlockRoom := g.lockRoom(roomID)
+	defer unlockRoom()
 
 	rm, found := g.cfg.Rooms.Get(roomID)
 	if !found {
@@ -1076,6 +1378,10 @@ func (g *WebSocketGateway) handleGameClose(conn *websocket.Conn, ctx context.Con
 	}
 	if rm.Round == nil {
 		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("game_not_started"))
+		return
+	}
+	if rm.Match != nil && rm.Match.Ended {
+		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("invalid_phase"))
 		return
 	}
 	currentID := ""
@@ -1159,83 +1465,221 @@ func (g *WebSocketGateway) handleGameClose(conn *websocket.Conn, ctx context.Con
 		return
 	}
 
-	rm2, _ := g.cfg.Rooms.Get(roomID)
-	// build round.ended scores
-	reason := rm2.Round.EndReason
-	if reason == "" {
-		reason = rm2.Round.Reason
+	if err := g.emitRoundLifecycle(roomID, env.RequestID, "close"); err != nil {
+		g.writeEnvelopeError(conn, ctx, env.RequestID, lifecycleActionError(err))
 	}
-	if reason == "" {
-		reason = "close"
-	}
-	scores := rm2.Round.ScoresSlice()
-	scoreList := make([]map[string]interface{}, 0, len(rm2.Members))
-	for i, member := range rm2.Members {
-		status := "calculated"
-		entry := map[string]interface{}{
-			"player_id":        member,
-			"score_status":     status,
-			"cumulative_score": 0,
-		}
+}
+
+func matchScoreboard(rm room.Room, scores []int) []map[string]interface{} {
+	out := make([]map[string]interface{}, 0, len(rm.Members))
+	for i, member := range rm.Members {
+		score := 0
 		if i < len(scores) {
-			sc := scores[i]
-			if rm2.Round.GameOver {
-				if sc == -50 {
-					entry["round_score"] = sc
-					entry["score_status"] = "calculated"
-				} else {
-					entry["score_status"] = "not_calculated"
-					delete(entry, "round_score")
-				}
+			score = scores[i]
+		}
+		out = append(out, map[string]interface{}{"player_id": member, "display_name": displayNameForRoomMember(member), "cumulative_score": score})
+	}
+	return out
+}
+
+func finalRanking(rm room.Room, m *game.Match) []map[string]interface{} {
+	out := make([]map[string]interface{}, 0, len(rm.Members))
+	for _, rank := range m.FinalRankings() {
+		member := rm.Members[rank.Player]
+		out = append(out, map[string]interface{}{"player_id": member, "display_name": displayNameForRoomMember(member), "cumulative_score": rank.Score, "rank": rank.Rank})
+	}
+	return out
+}
+
+func (g *WebSocketGateway) displayName(id string) string {
+	if guest, err := g.lookupGuest(id); err == nil && guest != nil && guest.DisplayName != "" {
+		return guest.DisplayName
+	}
+	return id
+}
+
+func displayNameForRoomMember(id string) string { return id }
+
+func lifecycleActionError(err error) ActionError {
+	if ae, ok := err.(ActionError); ok {
+		return ae
+	}
+	if err == game.ErrMatchAlreadyEnded || err == game.ErrMatchEnded || err == game.ErrInvalidMatchRound || err == game.ErrFourthRound {
+		return NewActionError("invalid_phase")
+	}
+	return NewActionError("invalid_request")
+}
+
+func (g *WebSocketGateway) emitRoundLifecycle(roomID, requestID, defaultReason string) error {
+	rm, ok := g.cfg.Rooms.Get(roomID)
+	if !ok || rm.Round == nil {
+		return NewActionError("not_found")
+	}
+	round := rm.Round
+	roundNumber := 1
+	if rm.Match != nil {
+		roundNumber = rm.Match.RoundNumber
+	}
+	scores := round.ScoresSlice()
+	if len(scores) != len(rm.Members) {
+		return NewActionError("invalid_request")
+	}
+	match := rm.Match
+	if match == nil {
+		match = game.NewMatch(len(rm.Members), round)
+	}
+	if len(match.CumulativeScores) != len(rm.Members) {
+		return NewActionError("invalid_request")
+	}
+
+	// Build the next round before mutating Match. Deal and NewRound errors are
+	// returned to the caller; they must not leave a completed match without an
+	// active round.
+	var next *game.Round
+	if match.RoundNumber < 3 {
+		var err error
+		next, err = buildNextRound(len(rm.Members))
+		if err != nil {
+			return err
+		}
+	}
+	if err := g.cfg.Rooms.ApplyRoundTransition(rm.ID, next, func(stored *room.Room) error {
+		if err := match.CompleteRound(scores, round); err != nil {
+			return err
+		}
+		if stored.Match == nil {
+			stored.Match = match
+		}
+		if next != nil {
+			return match.StartNextRound(next)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	var found bool
+	rm, found = g.cfg.Rooms.Get(roomID)
+	if !found || rm.Match == nil || rm.Round == nil {
+		return NewActionError("not_found")
+	}
+	matchEnded := rm.Match.Ended
+	// game.state is deliberately first: it acknowledges the accepted action.
+	if err := g.broadcastGameState(roomID, requestID); err != nil {
+		return err
+	}
+	reason := round.EndReason
+	if reason == "" {
+		reason = round.Reason
+	}
+	if reason == "" {
+		reason = defaultReason
+	}
+	scoreList := make([]map[string]interface{}, 0, len(rm.Members))
+	for i, member := range rm.Members {
+		entry := map[string]interface{}{"player_id": member, "score_status": "calculated", "cumulative_score": 0}
+		if i < len(scores) {
+			entry["cumulative_score"] = rm.Match.CumulativeScores[i]
+			if round.GameOver && scores[i] != -50 {
+				entry["score_status"] = "not_calculated"
 			} else {
-				entry["round_score"] = sc
-				entry["score_status"] = "calculated"
+				entry["round_score"] = scores[i]
 			}
-			entry["cumulative_score"] = sc
 		}
 		scoreList = append(scoreList, entry)
 	}
-	ended := map[string]interface{}{
-		"version":    "v1",
-		"type":       "event",
-		"name":       "round.ended",
-		"request_id": env.RequestID,
-		"room_id":    rm2.ID,
-		"payload": map[string]interface{}{
-			"round_number": 1,
-			"reason":       reason,
-			"scores":       scoreList,
-		},
+	ended := map[string]interface{}{"version": "v1", "type": "event", "name": "round.ended", "request_id": requestID, "room_id": rm.ID,
+		"payload": map[string]interface{}{"round_number": roundNumber, "reason": reason, "scores": scoreList}}
+	if err := g.broadcastLifecycleMessage(rm, ended); err != nil {
+		return err
 	}
-	endedRaw, _ := json.Marshal(ended)
+	updated := map[string]interface{}{"version": "v1", "type": "event", "name": "match.updated", "request_id": requestID, "room_id": rm.ID,
+		"payload": map[string]interface{}{"round_number": rm.Match.RoundNumber, "scoreboard": g.matchScoreboard(rm, rm.Match.CumulativeScores)}}
+	if err := g.broadcastLifecycleMessage(rm, updated); err != nil {
+		return err
+	}
+	if matchEnded {
+		endedMatch := map[string]interface{}{"version": "v1", "type": "event", "name": "match.ended", "request_id": requestID, "room_id": rm.ID,
+			"payload": map[string]interface{}{"round_number": roundNumber, "final_ranking": g.finalRanking(rm, rm.Match)}}
+		if err := g.broadcastLifecycleMessage(rm, endedMatch); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-	for _, member := range rm2.Members {
-		c, ok := g.cfg.Connections.GetByGuest(member)
-		if !ok || c == nil {
-			continue
-		}
-		ws, ok := c.Conn.(*websocket.Conn)
-		if !ok || ws == nil {
-			continue
-		}
-		_ = ws.Write(context.Background(), websocket.MessageText, endedRaw)
-		proj, err := realtime.Project(&rm2, rm2.Round, member)
-		if err != nil {
-			continue
-		}
-		resp := map[string]interface{}{
-			"version":    "v1",
-			"type":       "event",
-			"name":       "game.state",
-			"request_id": env.RequestID,
-			"room_id":    rm2.ID,
-			"payload": map[string]interface{}{
-				"state": proj,
-			},
-		}
-		raw, _ := json.Marshal(resp)
-		_ = ws.Write(context.Background(), websocket.MessageText, raw)
+func buildNextRound(playerCount int) (*game.Round, error) {
+	deck := game.StandardDeck()
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	rng.Shuffle(len(deck), func(i, j int) { deck[i], deck[j] = deck[j], deck[i] })
+	deal, err := game.Deal(deck, playerCount)
+	if err != nil {
+		return nil, err
 	}
+	return game.NewRound(playerCount, deal.Hands, deal.ClosedDeck, deal.JokerRank)
+}
+
+func (g *WebSocketGateway) broadcastLifecycleMessage(rm room.Room, msg map[string]interface{}) error {
+	raw, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	for _, member := range rm.Members {
+		if c, ok := g.cfg.Connections.GetByGuest(member); ok && c != nil {
+			if ws, ok := c.Conn.(*websocket.Conn); ok && ws != nil {
+				if err := g.writeRaw(ws, context.Background(), raw, rm.ID); err != nil {
+					g.cfg.Connections.UnregisterIfCurrent(c)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (g *WebSocketGateway) matchScoreboard(rm room.Room, scores []int) []map[string]interface{} {
+	out := make([]map[string]interface{}, 0, len(rm.Members))
+	for i, member := range rm.Members {
+		score := 0
+		if i < len(scores) {
+			score = scores[i]
+		}
+		out = append(out, map[string]interface{}{"player_id": member, "display_name": g.displayName(member), "cumulative_score": score})
+	}
+	return out
+}
+
+func (g *WebSocketGateway) finalRanking(rm room.Room, m *game.Match) []map[string]interface{} {
+	out := make([]map[string]interface{}, 0, len(rm.Members))
+	for _, rank := range m.FinalRankings() {
+		member := rm.Members[rank.Player]
+		out = append(out, map[string]interface{}{"player_id": member, "display_name": g.displayName(member), "cumulative_score": rank.Score, "rank": rank.Rank})
+	}
+	return out
+}
+
+func (g *WebSocketGateway) broadcastGameState(roomID, requestID string) error {
+	rm, ok := g.cfg.Rooms.Get(roomID)
+	if !ok || rm.Round == nil {
+		return NewActionError("not_found")
+	}
+	for _, member := range rm.Members {
+		if c, ok := g.cfg.Connections.GetByGuest(member); ok && c != nil {
+			if ws, ok := c.Conn.(*websocket.Conn); ok && ws != nil {
+				proj, err := realtime.Project(&rm, rm.Round, member)
+				if err != nil {
+					continue
+				}
+				msg := map[string]interface{}{"version": "v1", "type": "event", "name": "game.state", "request_id": requestID, "room_id": rm.ID, "payload": map[string]interface{}{"state": proj}}
+				raw, err := json.Marshal(msg)
+				if err != nil {
+					continue
+				}
+				if err := g.writeRaw(ws, context.Background(), raw, rm.ID); err != nil {
+					g.cfg.Connections.UnregisterIfCurrent(c)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 type gameTakeDiscardPayload struct {
@@ -1261,6 +1705,8 @@ func (g *WebSocketGateway) handleGameTakeDiscard(conn *websocket.Conn, ctx conte
 		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("invalid_request"))
 		return
 	}
+	unlockRoom := g.lockRoom(roomID)
+	defer unlockRoom()
 	if payload.DiscardCardID == nil || len(payload.JagoCardIDs) != 2 {
 		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("invalid_request"))
 		return
@@ -1282,6 +1728,10 @@ func (g *WebSocketGateway) handleGameTakeDiscard(conn *websocket.Conn, ctx conte
 	}
 	if rm.Round == nil {
 		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("game_not_started"))
+		return
+	}
+	if rm.Match != nil && rm.Match.Ended {
+		g.writeEnvelopeError(conn, ctx, env.RequestID, NewActionError("invalid_phase"))
 		return
 	}
 	currentID := ""
@@ -1406,85 +1856,13 @@ func (g *WebSocketGateway) handleGameTakeDiscard(conn *websocket.Conn, ctx conte
 		return
 	}
 
-	rm2, _ := g.cfg.Rooms.Get(roomID)
-
-	// broadcast round.ended if game over
-	if rm2.Round != nil && rm2.Round.GameOver {
-		reason := rm2.Round.EndReason
-		if reason == "" {
-			reason = rm2.Round.Reason
+	if rm.Round.GameOver {
+		if err := g.emitRoundLifecycle(roomID, env.RequestID, "game_over"); err != nil {
+			g.writeEnvelopeError(conn, ctx, env.RequestID, lifecycleActionError(err))
 		}
-		if reason == "" {
-			reason = "game_over"
-		}
-		scores := rm2.Round.ScoresSlice()
-		scoreList := make([]map[string]interface{}, 0, len(rm2.Members))
-		for i, member := range rm2.Members {
-			entry := map[string]interface{}{
-				"player_id":        member,
-				"score_status":     "not_calculated",
-				"cumulative_score": 0,
-			}
-			if i < len(scores) && scores[i] == -50 {
-				entry["round_score"] = scores[i]
-				entry["score_status"] = "calculated"
-				entry["cumulative_score"] = scores[i]
-			}
-			scoreList = append(scoreList, entry)
-		}
-		ended := map[string]interface{}{
-			"version":    "v1",
-			"type":       "event",
-			"name":       "round.ended",
-			"request_id": env.RequestID,
-			"room_id":    rm2.ID,
-			"payload": map[string]interface{}{
-				"round_number": 1,
-				"reason":       reason,
-				"scores":       scoreList,
-			},
-		}
-		endedRaw, _ := json.Marshal(ended)
-		for _, member := range rm2.Members {
-			c, ok := g.cfg.Connections.GetByGuest(member)
-			if !ok || c == nil {
-				continue
-			}
-			ws, ok := c.Conn.(*websocket.Conn)
-			if !ok || ws == nil {
-				continue
-			}
-			_ = ws.Write(context.Background(), websocket.MessageText, endedRaw)
-		}
+		return
 	}
-
-	// broadcast game.state
-	for _, member := range rm2.Members {
-		c, ok := g.cfg.Connections.GetByGuest(member)
-		if !ok || c == nil {
-			continue
-		}
-		ws, ok := c.Conn.(*websocket.Conn)
-		if !ok || ws == nil {
-			continue
-		}
-		proj, err := realtime.Project(&rm2, rm2.Round, member)
-		if err != nil {
-			continue
-		}
-		resp := map[string]interface{}{
-			"version":    "v1",
-			"type":       "event",
-			"name":       "game.state",
-			"request_id": env.RequestID,
-			"room_id":    rm2.ID,
-			"payload": map[string]interface{}{
-				"state": proj,
-			},
-		}
-		raw, _ := json.Marshal(resp)
-		_ = ws.Write(context.Background(), websocket.MessageText, raw)
-	}
+	g.broadcastGameState(roomID, env.RequestID)
 }
 
 func seenDiscardOrJago(id, discardID string) bool { return false }
