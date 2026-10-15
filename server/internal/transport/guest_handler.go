@@ -17,9 +17,16 @@ import (
 	"remi-jadul/server/internal/auth"
 )
 
+// GuestIdentityStore creates and looks up guest identities.
+type GuestIdentityStore interface {
+	CreateGuest(nickname string) (*auth.Guest, error)
+	GetGuest(id string) (*auth.Guest, error)
+}
+
 // GuestHandlerConfig configures REST guest creation.
 type GuestHandlerConfig struct {
 	Store    *auth.GuestStore
+	Repo     GuestIdentityStore
 	Secret   string
 	Issuer   string
 	TokenTTL time.Duration
@@ -59,6 +66,10 @@ func NewGuestHandler(args ...interface{}) *GuestHandler {
 			}
 		case *auth.GuestStore:
 			store = v
+		case GuestIdentityStore:
+			if v != nil {
+				cfg.Repo = v
+			}
 		case string:
 			if store == nil && !strings.HasPrefix(v, "remi") {
 				// heuristic: secret if not obviously issuer
@@ -92,6 +103,9 @@ func NewGuestHandler(args ...interface{}) *GuestHandler {
 func mergeGuestConfig(base, v GuestHandlerConfig) GuestHandlerConfig {
 	if v.Store != nil {
 		base.Store = v.Store
+	}
+	if v.Repo != nil {
+		base.Repo = v.Repo
 	}
 	if v.Secret != "" {
 		base.Secret = v.Secret
@@ -187,8 +201,13 @@ func (h *GuestHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 	h.idemp.bodyHash[scope] = append([]byte{}, bodyBytes...)
 	h.idemp.mu.Unlock()
 
-	guest, err := h.cfg.Store.CreateGuest(trimmed)
-	if err != nil {
+	var guest *auth.Guest
+	if h.cfg.Repo != nil {
+		guest, err = h.cfg.Repo.CreateGuest(trimmed)
+	} else {
+		guest, err = h.cfg.Store.CreateGuest(trimmed)
+	}
+	if err != nil || guest == nil {
 		h.writeError(w, requestID, 400, "invalid_request", "Display name is required.")
 		return
 	}

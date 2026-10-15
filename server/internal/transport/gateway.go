@@ -20,7 +20,9 @@ import (
 // WebSocketGatewayConfig configures the WebSocket gateway.
 type WebSocketGatewayConfig struct {
 	Store       *auth.GuestStore
+	GuestRepo   GuestIdentityStore
 	Rooms       *room.Registry
+	Matches     *MatchHistoryStore
 	Connections *ConnectionRegistry
 	Secret      string
 	Issuer      string
@@ -35,6 +37,7 @@ func NewWebSocketGateway(args ...interface{}) *WebSocketGateway {
 	cfg := WebSocketGatewayConfig{Issuer: "remi-jadul"}
 	var store *auth.GuestStore
 	var rooms *room.Registry
+	var matches *MatchHistoryStore
 	var conns *ConnectionRegistry
 	for _, arg := range args {
 		switch v := arg.(type) {
@@ -46,8 +49,14 @@ func NewWebSocketGateway(args ...interface{}) *WebSocketGateway {
 			}
 		case *auth.GuestStore:
 			store = v
+		case GuestIdentityStore:
+			if v != nil {
+				cfg.GuestRepo = v
+			}
 		case *room.Registry:
 			rooms = v
+		case *MatchHistoryStore:
+			matches = v
 		case *ConnectionRegistry:
 			conns = v
 		case string:
@@ -67,11 +76,17 @@ func NewWebSocketGateway(args ...interface{}) *WebSocketGateway {
 	if rooms != nil {
 		cfg.Rooms = rooms
 	}
+	if matches != nil {
+		cfg.Matches = matches
+	}
 	if conns != nil {
 		cfg.Connections = conns
 	}
 	if cfg.Rooms == nil {
 		cfg.Rooms = room.NewRegistry()
+	}
+	if cfg.Matches == nil {
+		cfg.Matches = NewMatchHistoryStore()
 	}
 	if cfg.Connections == nil {
 		cfg.Connections = NewConnectionRegistry()
@@ -94,6 +109,9 @@ func (g *WebSocketGateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	token := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
 	guest, err := auth.ValidateJWT(token, g.cfg.Secret, g.cfg.Issuer, g.cfg.Store)
+	if (err != nil || guest == nil) && g.cfg.GuestRepo != nil {
+		guest, err = validateTokenWithRepo(token, g.cfg.Secret, g.cfg.Issuer, g.cfg.GuestRepo)
+	}
 	if err != nil || guest == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -392,7 +410,7 @@ func (g *WebSocketGateway) writeRoomUpdated(conn *websocket.Conn, ctx context.Co
 	for _, member := range rm.Members {
 		isHost := member == rm.Host
 		displayName := member
-		if mem, err := g.cfg.Store.GetGuest(member); err == nil && mem != nil {
+		if mem, err := g.lookupGuest(member); err == nil && mem != nil {
 			if mem.DisplayName != "" {
 				displayName = mem.DisplayName
 			}
@@ -488,7 +506,20 @@ func mapRoomError(err error) ActionError {
 
 func RoomsFromGateway(g *WebSocketGateway) *room.Registry { return g.cfg.Rooms }
 
-func (g *WebSocketGateway) Rooms() *room.Registry { return g.cfg.Rooms }
+func (g *WebSocketGateway) Rooms() *room.Registry       { return g.cfg.Rooms }
+func (g *WebSocketGateway) Matches() *MatchHistoryStore { return g.cfg.Matches }
+
+func (g *WebSocketGateway) lookupGuest(id string) (*auth.Guest, error) {
+	if g.cfg.Store != nil {
+		if guest, err := g.cfg.Store.GetGuest(id); err == nil && guest != nil {
+			return guest, nil
+		}
+	}
+	if g.cfg.GuestRepo != nil {
+		return g.cfg.GuestRepo.GetGuest(id)
+	}
+	return nil, auth.ErrGuestNotFound
+}
 
 func (g *WebSocketGateway) writeEnvelopeError(conn *websocket.Conn, ctx context.Context, requestID string, ae ActionError) {
 	wrapped := map[string]interface{}{
@@ -532,7 +563,7 @@ func (g *WebSocketGateway) roomUpdatedMessage(rm room.Room, requesterID string, 
 	for _, member := range rm.Members {
 		isHost := member == rm.Host
 		displayName := member
-		if mem, err := g.cfg.Store.GetGuest(member); err == nil && mem != nil && mem.DisplayName != "" {
+		if mem, err := g.lookupGuest(member); err == nil && mem != nil && mem.DisplayName != "" {
 			displayName = mem.DisplayName
 		}
 		players = append(players, map[string]interface{}{

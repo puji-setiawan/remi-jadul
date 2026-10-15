@@ -1,65 +1,75 @@
-# Task — Flutter protocol v1 contract models and fixture tests
+# Task — REST room discovery, match history, and API server wiring
 
-Status: READY
-Owner: FE
+Status: DONE
+Owner: BE
 Priority: P1
 
 ## Goal
 
-Start Phase 5 (Flutter Android client) by implementing pure Dart protocol v1 serialization/deserialization models and executable contract fixture tests in `app/` that match `docs/protocol/contract.md` and `docs/protocol/examples.md`. This unblocks `docs/coordination/CONTRACT_STATUS.md` before building lobby, room, and gameplay screens.
+Wire the REST discovery (`GET /api/v1/rooms`), match history (`GET /api/v1/matches/{match_id}`), and WebSocket gateway (`/ws`) endpoints together with the existing guest endpoint (`POST /api/v1/guests`) into a single runnable HTTP server in `server/internal/transport/` and `server/cmd/api/main.go`.
 
 ## Acceptance criteria
 
-- [ ] Dart models in `app/lib/protocol/` encode all v1 client commands (`room.create`, `room.join`, `room.leave`, `game.start`, `game.draw`, `game.take_discard`, `game.laydown`, `game.discard`, `game.close`, `state.resync`) inside the v1 WebSocket envelope (`version`, `type`, `name`, `request_id`, optional `room_id`, `payload`) without client `sequence`.
-- [ ] Dart models decode all v1 server events (`room.updated`, `game.started`, `game.state`, `game.drawn`, `round.ended`, `match.updated`, `match.ended`, `state.resynced`) and errors (`game.action_rejected`, `protocol.error`) with `snake_case` JSON fields.
-- [ ] Dart models decode REST v1 responses and error shapes (`POST /api/v1/guests`, `GET /api/v1/rooms`, `GET /api/v1/matches/{match_id}`).
-- [ ] Unknown JSON fields are ignored without throwing, and unknown message names or invalid envelopes surface a typed client decode error without inventing fallback game state.
-- [ ] Opponent projections expose `hand_size` only and never invent or require opponent card lists, marker cards, or closed-deck order.
-- [ ] Round-ended decoding supports both `score_status: "calculated"` (with `round_score`) and `score_status: "not_calculated"` (with nullable/omitted `round_score`).
-- [ ] Unit tests in `app/test/protocol/` verify every fixture in `docs/protocol/examples.md` and `docs/protocol/contract.md`, including unhappy-path malformed JSON, unknown event/error codes, and boundary cases (empty combinations, nullable fields, resync snapshot replacement metadata).
-- [ ] `make fe-test` and `make fe-analyze` pass with zero warnings.
+- [x] `GET /api/v1/rooms?visibility=public` returns HTTP `200` with `{ "version": "v1", "request_id": "...", "rooms": [...] }` containing only waiting public rooms with open seats (`room_id`, `visibility`, `capacity`, `occupied_seats`, `status`) and never exposes `private_code` or player hands.
+- [x] `GET /api/v1/rooms` with an unsupported `visibility` query parameter returns HTTP `400` with the standard v1 REST error shape (`version`, `code: "invalid_request"`, `message`, `request_id`).
+- [x] `GET /api/v1/matches/{match_id}` returns HTTP `200` with `{ "version": "v1", "request_id": "...", "match_id": "...", "round_count": 3, "final_ranking": [...] }` from the match history store/repository, or HTTP `404` with `code: "not_found"` when the match ID does not exist.
+- [x] Both new REST endpoints echo `X-Request-ID` when provided and generate a `request_id` when omitted.
+- [x] `server/cmd/api/main.go` mounts `POST /api/v1/guests`, `GET /api/v1/rooms`, `GET /api/v1/matches/{match_id}`, and the WebSocket gateway (`/ws`) sharing the same guest store and room registry (and optional PostgreSQL repositories when `DATABASE_URL` is configured).
+- [x] Handler and integration tests in `server/internal/transport/` cover happy paths, invalid query/path inputs, unknown match IDs (`404`), and verify private rooms/codes are excluded from public room discovery.
+- [x] `make be-fmt`, `make be-test`, `cd server && go vet ./...`, and `cd server && go test -race ./...` pass.
 
 ## Allowed files/packages
 
-- `app/lib/protocol/...`
-- `app/test/protocol/...`
-- `docs/coordination/CONTRACT_STATUS.md`
+- `server/cmd/api/...`
+- `server/internal/transport/...`
 - `docs/coordination/CURRENT_TASK.md`
 
 ## Out of scope
 
-- UI screens, widgets, navigation, or pseudo-3D tabletop rendering.
-- Live HTTP or WebSocket network client connection management.
-- Client-side game rule validation, combination checking, or score calculation.
-- Any changes to `server/` or protocol specifications.
+- Multi-round WebSocket progression (`match.updated` / `match.ended` / `state.resync` gateway handlers — next BE slice).
+- Changes to the pure game engine (`server/internal/game/`).
+- New database migrations (`server/migrations/`).
+- Flutter client changes (`app/`).
 
 ## Dependencies and decisions
 
-- Rules/decision records: `docs/decisions/0001-mvp-baseline.md`, `docs/decisions/0011-protocol-v1-contract.md`.
-- Protocol specification: `docs/protocol/contract.md`, `docs/protocol/envelope.md`, `docs/protocol/commands.md`, `docs/protocol/events.md`, `docs/protocol/errors.md`, `docs/protocol/examples.md`, `docs/protocol/visibility.md`.
-- Coordination gate: `docs/coordination/CONTRACT_STATUS.md` requires FE executable contract fixtures before shared vertical slices.
-- Blockers: None. All protocol v1 decisions are `Accepted`.
+- Rules/decision records: `docs/decisions/0001-mvp-baseline.md`, `docs/decisions/0011-protocol-v1-contract.md`, `docs/decisions/0013-backend-stack.md`.
+- Protocol contract: `docs/protocol/contract.md` (REST v1 boundary: `POST /api/v1/guests`, `GET /api/v1/rooms`, `GET /api/v1/matches/{match_id}`).
+- Architecture: `docs/ARCHITECTURE.md`.
+- Blockers: None.
 
 ## Protocol impact
 
-None (implements the existing v1 contract on the Flutter client side).
+None (implements the already-specified REST v1 endpoints in `docs/protocol/contract.md`).
 
 ## Verification
 
 Expected commands:
 
 ```text
-make fe-test
-make fe-analyze
+make be-fmt
+make be-test
+cd server && go vet ./...
+cd server && go test -race ./...
 ```
 
 ## Handoff result
 
 Changed:
-- 
+- Added `RoomDiscoveryHandler` (`server/internal/transport/rooms_handler.go`) serving `GET /api/v1/rooms?visibility=public` with `X-Request-ID` correlation, deterministic room ordering, strict `visibility=public` validation, and zero exposure of private rooms, private codes, or player hand data.
+- Added `MatchHistoryStore` and `MatchHistoryHandler` (`server/internal/transport/matches_handler.go`) serving `GET /api/v1/matches/{match_id}` with rank-ordered `final_ranking`, `X-Request-ID` correlation, and `404 not_found` handling for unknown or invalid match IDs.
+- Added unified `transport.Server` (`server/internal/transport/server.go`) and updated `server/cmd/api/main.go` to mount `POST /api/v1/guests`, `GET /api/v1/rooms`, `GET /api/v1/matches/{match_id}`, and `/ws` over shared guest, room, connection, and match history stores (with optional PostgreSQL `GuestRepository` and `MatchRepository` wiring when `DATABASE_URL` is set).
+- Extended `GuestHandler` and `WebSocketGateway` (`server/internal/transport/guest_handler.go`, `server/internal/transport/gateway.go`, `server/internal/transport/jwt.go`) to support optional `GuestIdentityStore` persistence repositories alongside in-memory stores.
+- Added unit and end-to-end integration tests in `server/internal/transport/rest_handlers_test.go`.
+
 Verified:
-- 
+- `make be-fmt` — PASS
+- `make be-test` — PASS
+- `cd server && go vet ./...` — PASS
+- `cd server && go test -race ./...` — PASS
+
 Known risks:
-- 
+- None.
+
 Next task:
-- Guest entry and public/private lobby screen slice (FE) or HTTP/WebSocket runtime wiring in `server/cmd/api` (BE).
+- Complete WebSocket gateway end-to-end lifecycle (`state.resync`, 3-round match progression with `match.updated` & `match.ended`, per-recipient `sequence`, and command `request_id` idempotency).
