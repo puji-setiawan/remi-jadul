@@ -42,38 +42,38 @@ Game kartu Remi online Android untuk 2–4 pemain dengan room publik/privat, per
 
 ### Phase 1 — Pure Go game engine
 
-- [ ] Card model and physical card IDs.
-- [ ] Standard deck, shuffle, deal, and joker marker.
-- [ ] Seri and paralel validation.
-- [ ] Joker representation validation.
-- [ ] Table combination locking.
-- [ ] Turn state and legal action validation.
-- [ ] Closed-deck draw and discard pickup.
-- [ ] Close, game-over, and deterministic scoring.
-- [ ] Table-driven unit tests for valid, invalid, and boundary cases.
+- [x] Card model and physical card IDs.
+- [x] Standard deck, shuffle, deal, and joker marker.
+- [x] Seri and paralel validation.
+- [x] Joker representation validation.
+- [x] Table combination locking.
+- [x] Turn state and legal action validation.
+- [x] Closed-deck draw and discard pickup.
+- [x] Close, game-over, and deterministic scoring.
+- [x] Table-driven unit tests for valid, invalid, and boundary cases.
 
 ### Phase 2 — Room and guest identity
 
-- [ ] Guest nickname identity.
-- [ ] Public/private room lifecycle.
-- [ ] Host start and 2–4 player validation.
-- [ ] In-memory active rooms.
+- [x] Guest nickname identity.
+- [x] Public/private room lifecycle.
+- [x] Host start and 2–4 player validation.
+- [x] In-memory active rooms.
 
 ### Phase 3 — REST and WebSocket protocol
 
-- [ ] Versioned protocol in `docs/protocol/`.
-- [ ] Personalized state projections.
-- [ ] Action errors and request IDs.
-- [ ] Event sequence/order handling.
-- [ ] Reconnect and stale-event behavior.
-- [ ] Visibility and contract tests.
+- [x] Versioned protocol in `docs/protocol/`.
+- [x] Personalized state projections.
+- [x] Action errors and request IDs.
+- [x] Event sequence/order handling.
+- [x] Reconnect and stale-event behavior.
+- [x] Visibility and contract tests.
 
 ### Phase 4 — PostgreSQL persistence
 
-- [ ] Versioned migrations.
-- [ ] Guest/profile repository.
-- [ ] Completed match and round result repository.
-- [ ] Persistence integration tests.
+- [x] Versioned migrations.
+- [x] Guest/profile repository.
+- [x] Completed match and round result repository.
+- [x] Persistence integration tests.
 
 ### Phase 5 — Flutter Android client
 
