@@ -1,46 +1,47 @@
-# Task — REST room discovery, match history, and API server wiring
+# Task — Complete WebSocket match lifecycle
 
-Status: DONE
+Status: READY
 Owner: BE
 Priority: P1
 
 ## Goal
 
-Wire the REST discovery (`GET /api/v1/rooms`), match history (`GET /api/v1/matches/{match_id}`), and WebSocket gateway (`/ws`) endpoints together with the existing guest endpoint (`POST /api/v1/guests`) into a single runnable HTTP server in `server/internal/transport/` and `server/cmd/api/main.go`.
+Complete the authenticated WebSocket lifecycle after room start: personalized resync, per-recipient sequence handling, request idempotency, and three-round match completion events. Preserve server authority and the existing v1 protocol contract.
 
 ## Acceptance criteria
 
-- [x] `GET /api/v1/rooms?visibility=public` returns HTTP `200` with `{ "version": "v1", "request_id": "...", "rooms": [...] }` containing only waiting public rooms with open seats (`room_id`, `visibility`, `capacity`, `occupied_seats`, `status`) and never exposes `private_code` or player hands.
-- [x] `GET /api/v1/rooms` with an unsupported `visibility` query parameter returns HTTP `400` with the standard v1 REST error shape (`version`, `code: "invalid_request"`, `message`, `request_id`).
-- [x] `GET /api/v1/matches/{match_id}` returns HTTP `200` with `{ "version": "v1", "request_id": "...", "match_id": "...", "round_count": 3, "final_ranking": [...] }` from the match history store/repository, or HTTP `404` with `code: "not_found"` when the match ID does not exist.
-- [x] Both new REST endpoints echo `X-Request-ID` when provided and generate a `request_id` when omitted.
-- [x] `server/cmd/api/main.go` mounts `POST /api/v1/guests`, `GET /api/v1/rooms`, `GET /api/v1/matches/{match_id}`, and the WebSocket gateway (`/ws`) sharing the same guest store and room registry (and optional PostgreSQL repositories when `DATABASE_URL` is configured).
-- [x] Handler and integration tests in `server/internal/transport/` cover happy paths, invalid query/path inputs, unknown match IDs (`404`), and verify private rooms/codes are excluded from public room discovery.
-- [x] `make be-fmt`, `make be-test`, `cd server && go vet ./...`, and `cd server && go test -race ./...` pass.
+- [ ] `state.resync` returns a full personalized snapshot with the documented replacement sequence metadata.
+- [ ] Each recipient has an independent monotonic sequence stream; private events do not create gaps for other recipients.
+- [ ] Repeating an accepted command `request_id` returns the original result without executing the command twice.
+- [ ] Repeating a rejected command `request_id` returns the original error without mutating state.
+- [ ] Reusing a request ID with a different payload returns `invalid_request`.
+- [ ] A completed round emits `round.ended` before `match.updated`.
+- [ ] After round three, the server emits `match.ended` with equal-score ties sharing a rank.
+- [ ] Tests cover reconnect, stale sequence, duplicate request, wrong turn, hidden-card visibility, and three-round completion.
 
 ## Allowed files/packages
 
-- `server/cmd/api/...`
 - `server/internal/transport/...`
+- `server/internal/realtime/...`
+- `server/internal/room/...` only when required by the lifecycle interface
+- `server/cmd/api/...` only for wiring required by this task
 - `docs/coordination/CURRENT_TASK.md`
 
 ## Out of scope
 
-- Multi-round WebSocket progression (`match.updated` / `match.ended` / `state.resync` gateway handlers — next BE slice).
-- Changes to the pure game engine (`server/internal/game/`).
-- New database migrations (`server/migrations/`).
-- Flutter client changes (`app/`).
+- Flutter implementation.
+- Pure game engine rule changes.
+- New REST endpoints.
+- New database migrations.
+- Protocol shape changes. Any required contract change must stop and create a decision packet first.
 
 ## Dependencies and decisions
 
-- Rules/decision records: `docs/decisions/0001-mvp-baseline.md`, `docs/decisions/0011-protocol-v1-contract.md`, `docs/decisions/0013-backend-stack.md`.
-- Protocol contract: `docs/protocol/contract.md` (REST v1 boundary: `POST /api/v1/guests`, `GET /api/v1/rooms`, `GET /api/v1/matches/{match_id}`).
-- Architecture: `docs/ARCHITECTURE.md`.
-- Blockers: None.
-
-## Protocol impact
-
-None (implements the already-specified REST v1 endpoints in `docs/protocol/contract.md`).
+- Protocol: `docs/protocol/contract.md`, `docs/protocol/examples.md`, `docs/protocol/envelope.md`, `docs/protocol/events.md`, `docs/protocol/visibility.md`.
+- Decision: `docs/decisions/0011-protocol-v1-contract.md`.
+- Rules: `docs/GAME_RULES.md`.
+- Previous task: REST room discovery, match history, and API server wiring.
+- Blockers: None known.
 
 ## Verification
 
@@ -56,20 +57,6 @@ cd server && go test -race ./...
 ## Handoff result
 
 Changed:
-- Added `RoomDiscoveryHandler` (`server/internal/transport/rooms_handler.go`) serving `GET /api/v1/rooms?visibility=public` with `X-Request-ID` correlation, deterministic room ordering, strict `visibility=public` validation, and zero exposure of private rooms, private codes, or player hand data.
-- Added `MatchHistoryStore` and `MatchHistoryHandler` (`server/internal/transport/matches_handler.go`) serving `GET /api/v1/matches/{match_id}` with rank-ordered `final_ranking`, `X-Request-ID` correlation, and `404 not_found` handling for unknown or invalid match IDs.
-- Added unified `transport.Server` (`server/internal/transport/server.go`) and updated `server/cmd/api/main.go` to mount `POST /api/v1/guests`, `GET /api/v1/rooms`, `GET /api/v1/matches/{match_id}`, and `/ws` over shared guest, room, connection, and match history stores (with optional PostgreSQL `GuestRepository` and `MatchRepository` wiring when `DATABASE_URL` is set).
-- Extended `GuestHandler` and `WebSocketGateway` (`server/internal/transport/guest_handler.go`, `server/internal/transport/gateway.go`, `server/internal/transport/jwt.go`) to support optional `GuestIdentityStore` persistence repositories alongside in-memory stores.
-- Added unit and end-to-end integration tests in `server/internal/transport/rest_handlers_test.go`.
-
 Verified:
-- `make be-fmt` — PASS
-- `make be-test` — PASS
-- `cd server && go vet ./...` — PASS
-- `cd server && go test -race ./...` — PASS
-
 Known risks:
-- None.
-
 Next task:
-- Complete WebSocket gateway end-to-end lifecycle (`state.resync`, 3-round match progression with `match.updated` & `match.ended`, per-recipient `sequence`, and command `request_id` idempotency).
